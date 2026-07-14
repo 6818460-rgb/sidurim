@@ -694,8 +694,16 @@ function DriveDocumentsUpload() {
       setStatus(`הקובץ "${result.name || file.name}" הועלה בהצלחה.`);
     } catch (error) {
       console.error("Google Drive upload error:", error);
+
+      const details =
+        error instanceof Error
+          ? error.message
+          : error?.type ||
+            error?.error ||
+            JSON.stringify(error);
+
       setStatus(
-        "ההעלאה ל-Google Drive נכשלה. בדוק את ההרשאה ונסה שוב."
+        `ההעלאה ל-Google Drive נכשלה: ${details || "שגיאה לא ידועה"}`
       );
     } finally {
       setIsUploading(false);
