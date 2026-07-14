@@ -454,6 +454,7 @@ function App() {
             items={filtered.filter((item) => item.domain === "אישי")}
             add={() => addItem("אישי", "personal-today", "פריט אישי חדש")}
             openCard={setSelected}
+            driveFolderParts={["SIDURIM", "\u05d0\u05d9\u05e9\u05d9", "\u05db\u05dc\u05dc\u05d9"]}
           />
         )}
 
@@ -463,6 +464,7 @@ function App() {
             items={filtered.filter((item) => item.domain === "כספים")}
             add={() => addItem("כספים", "money", "פריט כספי חדש")}
             openCard={setSelected}
+            driveFolderParts={["SIDURIM", "\u05db\u05e1\u05e4\u05d9\u05dd", "\u05db\u05dc\u05dc\u05d9"]}
           />
         )}
 
@@ -1098,26 +1100,38 @@ function SupplierTable() {
   );
 }
 
-function Simple({ title, items, add, openCard }) {
+function Simple({
+  title,
+  items,
+  add,
+  openCard,
+  driveFolderParts,
+}) {
   return (
-    <section className="card">
-      <div className="cardHeader">
-        <h1>{title}</h1>
-
-        <button className="primary" onClick={add}>
-          <Plus size={18} />
-          הוסף
-        </button>
-      </div>
-
-      {items.length ? (
-        items.map((item) => (
-          <TaskRow key={item.id} item={item} openCard={openCard} />
-        ))
-      ) : (
-        <p>אין פריטים.</p>
+    <>
+      {driveFolderParts && (
+        <DriveUpload folderParts={driveFolderParts} />
       )}
-    </section>
+
+      <section className="card">
+        <div className="cardHeader">
+          <h1>{title}</h1>
+
+          <button className="primary" onClick={add}>
+            <Plus size={18} />
+            {"\u05d4\u05d5\u05e1\u05e3"}
+          </button>
+        </div>
+
+        {items.length ? (
+          items.map((item) => (
+            <TaskRow key={item.id} item={item} openCard={openCard} />
+          ))
+        ) : (
+          <p>{"\u05d0\u05d9\u05df \u05e4\u05e8\u05d9\u05d8\u05d9\u05dd."}</p>
+        )}
+      </section>
+    </>
   );
 }
 
