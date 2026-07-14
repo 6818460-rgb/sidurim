@@ -639,6 +639,8 @@ function ModuleScreen({
 
       {tab === "build-suppliers" && <SupplierTable />}
 
+      {tab === "build-docs" && <DriveDocumentsUpload />}
+
       <section className="card" ref={contentRef}>
         <div className="cardHeader">
           <h2>{tabs.find((current) => current[2] === tab)?.[0]}</h2>
@@ -661,6 +663,73 @@ function ModuleScreen({
         )}
       </section>
     </>
+  );
+}
+
+
+function DriveDocumentsUpload() {
+  const [status, setStatus] = useState(
+    "בחר מסמך להעלאה ל-Google Drive."
+  );
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploadedFile, setUploadedFile] = useState(null);
+
+  async function handleDriveFile(event) {
+    const file = event.target.files?.[0];
+
+    if (!file) return;
+
+    setIsUploading(true);
+    setUploadedFile(null);
+    setStatus(`מעלה את "${file.name}" ל-Google Drive...`);
+
+    try {
+      const result = await uploadFileToDrive(file, [
+        "SIDURIM",
+        "בנייה",
+        "מסמכים",
+      ]);
+
+      setUploadedFile(result);
+      setStatus(`הקובץ "${result.name || file.name}" הועלה בהצלחה.`);
+    } catch (error) {
+      console.error("Google Drive upload error:", error);
+      setStatus(
+        "ההעלאה ל-Google Drive נכשלה. בדוק את ההרשאה ונסה שוב."
+      );
+    } finally {
+      setIsUploading(false);
+      event.target.value = "";
+    }
+  }
+
+  return (
+    <section className="card pdf">
+      <h2>
+        <Upload size={22} />
+        העלאת מסמך ל-Google Drive
+      </h2>
+
+      <p>הקובץ יישמר בתיקייה SIDURIM / בנייה / מסמכים.</p>
+
+      <input
+        type="file"
+        onChange={handleDriveFile}
+        disabled={isUploading}
+      />
+
+      <p>{status}</p>
+
+      {uploadedFile?.webViewLink && (
+        <a
+          href={uploadedFile.webViewLink}
+          target="_blank"
+          rel="noreferrer"
+        >
+          פתח את הקובץ ב-Google Drive
+        </a>
+      )}
+    </section>
   );
 }
 
