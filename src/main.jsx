@@ -20,9 +20,6 @@ import {
   Upload,
   LogIn,
   LogOut,
-  Paperclip,
-  Download,
-  Trash2,
 } from "lucide-react";
 
 import * as pdfjsLib from "pdfjs-dist";
@@ -39,13 +36,9 @@ import {
   deleteDoc,
   doc,
   onSnapshot,
-  query,
   serverTimestamp,
   setDoc,
-  where,
 } from "firebase/firestore";
-
-import { deleteDriveFile, uploadFileToDrive } from "./googleDrive";
 
 import "./style.css";
 
@@ -440,7 +433,6 @@ function App() {
             addItem={addItem}
             openCard={setSelected}
             upsertJobs={upsertJobs}
-            user={user}
           />
         )}
 
@@ -449,7 +441,6 @@ function App() {
             items={filtered}
             addItem={addItem}
             openCard={setSelected}
-            user={user}
           />
         )}
 
@@ -478,7 +469,6 @@ function App() {
             onSave={updateItem}
             onToggle={() => toggleDone(selected.id)}
             onDelete={removeItem}
-            user={user}
           />
         )}
       </main>
@@ -604,7 +594,6 @@ function ModuleScreen({
   addItem,
   openCard,
   upsertJobs,
-  user,
 }) {
   const [tab, setTab] = useState(tabs[0][2]);
 
@@ -634,21 +623,6 @@ function ModuleScreen({
       )}
 
       {tab === "build-suppliers" && <SupplierTable />}
-
-      {domain === "בנייה" &&
-        ["build-docs", "build-photos"].includes(tab) && (
-          <DriveFiles
-            user={user}
-            area={tab}
-            itemId="category"
-            title={tab === "build-docs" ? "מסמכי בנייה" : "תמונות בנייה"}
-            folderParts={[
-              "SIDURIM",
-              "בנייה",
-              tab === "build-docs" ? "מסמכים" : "תמונות",
-            ]}
-          />
-        )}
 
       <section className="card">
         <div className="cardHeader">
@@ -988,171 +962,6 @@ function Simple({ title, items, add, openCard }) {
   );
 }
 
-
-function DriveFiles({ user, area, itemId, title, folderParts }) {
-  const [files, setFiles] = useState([]);
-  const [status, setStatus] = useState("");
-  const [uploading, setUploading] = useState(false);
-
-  useEffect(() => {
-    if (!user) {
-      setFiles([]);
-      return undefined;
-    }
-
-    const filesQuery = query(
-      collection(db, "users", user.uid, "driveFiles"),
-      where("area", "==", area),
-      where("itemId", "==", String(itemId))
-    );
-
-    return onSnapshot(
-      filesQuery,
-      (snapshot) => {
-        const nextFiles = snapshot.docs
-          .map((document) => ({ id: document.id, ...document.data() }))
-          .sort(
-            (a, b) =>
-              (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0)
-          );
-
-        setFiles(nextFiles);
-      },
-      (error) => {
-        console.error("Drive metadata read error:", error);
-        setStatus("לא ניתן לקרוא את רשימת הקבצים.");
-      }
-    );
-  }, [user, area, itemId]);
-
-  async function handleUpload(event) {
-    const selectedFiles = Array.from(event.target.files || []);
-    event.target.value = "";
-
-    if (!selectedFiles.length) return;
-
-    if (!user) {
-      alert("צריך להתחבר עם Google.");
-      return;
-    }
-
-    setUploading(true);
-    setStatus("מתחבר ל-Google Drive ומעלה...");
-
-    try {
-      for (const file of selectedFiles) {
-        const uploaded = await uploadFileToDrive(file, folderParts);
-        const metadataId =
-          typeof crypto !== "undefined" && crypto.randomUUID
-            ? crypto.randomUUID()
-            : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
-
-        await setDoc(
-          doc(db, "users", user.uid, "driveFiles", metadataId),
-          {
-            id: metadataId,
-            area,
-            itemId: String(itemId),
-            name: file.name,
-            size: file.size,
-            mimeType: file.type || "application/octet-stream",
-            driveFileId: uploaded.id,
-            webViewLink: uploaded.webViewLink,
-            iconLink: uploaded.iconLink || "",
-            createdAt: serverTimestamp(),
-          }
-        );
-      }
-
-      setStatus("הקבצים הועלו ל-Google Drive.");
-    } catch (error) {
-      console.error("Google Drive upload error:", error);
-      setStatus(
-        `העלאת הקובץ נכשלה${error?.message ? `: ${error.message}` : ""}`
-      );
-    } finally {
-      setUploading(false);
-    }
-  }
-
-  async function handleDelete(file) {
-    if (!user) return;
-    if (!confirm(`למחוק את "${file.name}"?`)) return;
-
-    try {
-      await deleteDriveFile(file.driveFileId);
-      await deleteDoc(
-        doc(db, "users", user.uid, "driveFiles", file.id)
-      );
-    } catch (error) {
-      console.error("Google Drive delete error:", error);
-      alert("מחיקת הקובץ נכשלה.");
-    }
-  }
-
-  function formatSize(size) {
-    if (!Number.isFinite(size)) return "";
-    if (size < 1024) return `${size} B`;
-    if (size < 1024 * 1024) return `${Math.round(size / 1024)} KB`;
-    return `${(size / (1024 * 1024)).toFixed(1)} MB`;
-  }
-
-  return (
-    <section className="card">
-      <div className="cardHeader">
-        <h2>
-          <Paperclip size={20} /> {title}
-        </h2>
-
-        <label className="primary" style={{ cursor: "pointer" }}>
-          <Upload size={18} />
-          {uploading ? "מעלה..." : "העלה ל-Drive"}
-          <input
-            type="file"
-            multiple
-            disabled={uploading}
-            onChange={handleUpload}
-            style={{ display: "none" }}
-          />
-        </label>
-      </div>
-
-      {!user && <p>התחבר כדי לצרף קבצים.</p>}
-      {status && <p>{status}</p>}
-      {user && files.length === 0 && <p>אין קבצים מצורפים.</p>}
-
-      {files.map((file) => (
-        <div
-          key={file.id}
-          className="task"
-          style={{ gridTemplateColumns: "1fr auto auto" }}
-        >
-          <div>
-            <b>{file.name}</b>
-            <div style={{ fontSize: 13, opacity: 0.7 }}>
-              {formatSize(file.size)}
-            </div>
-          </div>
-
-          <a
-            className="primary"
-            href={file.webViewLink}
-            target="_blank"
-            rel="noreferrer"
-            style={{ textDecoration: "none" }}
-          >
-            <Download size={17} /> פתח
-          </a>
-
-          <button onClick={() => handleDelete(file)}>
-            <Trash2 size={17} /> מחק
-          </button>
-        </div>
-      ))}
-    </section>
-  );
-}
-
 function Module({ icon, title, text, onClick, active }) {
   return (
     <button
@@ -1185,7 +994,6 @@ function TaskModal({
   onSave,
   onToggle,
   onDelete,
-  user,
 }) {
   const [draft, setDraft] = useState({ ...item });
 
@@ -1287,22 +1095,6 @@ function TaskModal({
             />
           </div>
         )}
-
-        {draft.domain === "בנייה" &&
-          draft.area === "build-suppliers" && (
-            <DriveFiles
-              user={user}
-              area="build-suppliers"
-              itemId={String(draft.id)}
-              title={`קבצים של ${draft.title || "הספק"}`}
-              folderParts={[
-                "SIDURIM",
-                "בנייה",
-                "ספקים והשוואות",
-                draft.title || String(draft.id),
-              ]}
-            />
-          )}
 
         <label>הערות</label>
         <textarea
