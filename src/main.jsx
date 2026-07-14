@@ -26,7 +26,10 @@ import * as pdfjsLib from "pdfjs-dist";
 import pdfWorker from "pdfjs-dist/build/pdf.worker?url";
 
 import { auth, db, googleProvider } from "./firebaseConfig";
-import { uploadFileToDrive } from "./googleDrive";
+import {
+  prepareGoogleDrive,
+  uploadFileToDrive,
+} from "./googleDrive";
 import {
   onAuthStateChanged,
   signInWithPopup,
@@ -669,29 +672,74 @@ function ModuleScreen({
 
 function DriveDocumentsUpload() {
   const [status, setStatus] = useState(
-    "בחר מסמך להעלאה ל-Google Drive."
+    "\u05d1\u05d7\u05e8 \u05de\u05e1\u05de\u05da \u05d5\u05dc\u05d0\u05d7\u05e8 \u05de\u05db\u05df \u05dc\u05d7\u05e5 \u05e2\u05dc \u05d4\u05e2\u05dc\u05d0\u05d4 \u05dc-Google Drive."
   );
+  const [selectedFile, setSelectedFile] = useState(null);
+  const [isDriveReady, setIsDriveReady] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadedFile, setUploadedFile] = useState(null);
 
-  async function handleDriveFile(event) {
-    const file = event.target.files?.[0];
+  useEffect(() => {
+    let active = true;
 
-    if (!file) return;
+    prepareGoogleDrive()
+      .then(() => {
+        if (active) setIsDriveReady(true);
+      })
+      .catch((error) => {
+        console.error("Google Drive preparation error:", error);
+        if (active) {
+          setStatus(
+            "\u05dc\u05d0 \u05e0\u05d9\u05ea\u05df \u05dc\u05d8\u05e2\u05d5\u05df \u05d0\u05ea \u05e9\u05d9\u05e8\u05d5\u05ea \u05d4\u05d4\u05e8\u05e9\u05d0\u05d5\u05ea \u05e9\u05dc Google Drive."
+          );
+        }
+      });
+
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  function handleDriveFile(event) {
+    const file = event.target.files?.[0] || null;
+
+    setSelectedFile(file);
+    setUploadedFile(null);
+
+    if (file) {
+      setStatus(`\u05d4\u05e7\u05d5\u05d1\u05e5 "${file.name}" \u05de\u05d5\u05db\u05df \u05dc\u05d4\u05e2\u05dc\u05d0\u05d4.`);
+    } else {
+      setStatus("\u05dc\u05d0 \u05e0\u05d1\u05d7\u05e8 \u05e7\u05d5\u05d1\u05e5.");
+    }
+  }
+
+  async function uploadSelectedFile() {
+    if (!selectedFile) {
+      setStatus("\u05d1\u05d7\u05e8 \u05ea\u05d7\u05d9\u05dc\u05d4 \u05e7\u05d5\u05d1\u05e5.");
+      return;
+    }
+
+    if (!isDriveReady) {
+      setStatus("\u05e9\u05d9\u05e8\u05d5\u05ea Google Drive \u05e2\u05d3\u05d9\u05d9\u05df \u05e0\u05d8\u05e2\u05df. \u05e0\u05e1\u05d4 \u05e9\u05d5\u05d1 \u05d1\u05e2\u05d5\u05d3 \u05e8\u05d2\u05e2.");
+      return;
+    }
+
+    const file = selectedFile;
 
     setIsUploading(true);
     setUploadedFile(null);
-    setStatus(`מעלה את "${file.name}" ל-Google Drive...`);
+    setStatus(`\u05de\u05e2\u05dc\u05d4 \u05d0\u05ea "${file.name}" \u05dc-Google Drive...`);
 
     try {
       const result = await uploadFileToDrive(file, [
         "SIDURIM",
-        "בנייה",
-        "מסמכים",
+        "\u05d1\u05e0\u05d9\u05d9\u05d4",
+        "\u05de\u05e1\u05de\u05db\u05d9\u05dd",
       ]);
 
       setUploadedFile(result);
-      setStatus(`הקובץ "${result.name || file.name}" הועלה בהצלחה.`);
+      setSelectedFile(null);
+      setStatus(`\u05d4\u05e7\u05d5\u05d1\u05e5 "${result.name || file.name}" \u05d4\u05d5\u05e2\u05dc\u05d4 \u05d1\u05d4\u05e6\u05dc\u05d7\u05d4.`);
     } catch (error) {
       console.error("Google Drive upload error:", error);
 
@@ -703,11 +751,10 @@ function DriveDocumentsUpload() {
             JSON.stringify(error);
 
       setStatus(
-        `ההעלאה ל-Google Drive נכשלה: ${details || "שגיאה לא ידועה"}`
+        `\u05d4\u05d4\u05e2\u05dc\u05d0\u05d4 \u05dc-Google Drive \u05e0\u05db\u05e9\u05dc\u05d4: ${details || "\u05e9\u05d2\u05d9\u05d0\u05d4 \u05dc\u05d0 \u05d9\u05d3\u05d5\u05e2\u05d4"}`
       );
     } finally {
       setIsUploading(false);
-      event.target.value = "";
     }
   }
 
@@ -715,16 +762,28 @@ function DriveDocumentsUpload() {
     <section className="card pdf">
       <h2>
         <Upload size={22} />
-        העלאת מסמך ל-Google Drive
+        {"\u05d4\u05e2\u05dc\u05d0\u05ea \u05de\u05e1\u05de\u05da \u05dc-Google Drive"}
       </h2>
 
-      <p>הקובץ יישמר בתיקייה SIDURIM / בנייה / מסמכים.</p>
+      <p>{"\u05d4\u05e7\u05d5\u05d1\u05e5 \u05d9\u05d9\u05e9\u05de\u05e8 \u05d1\u05ea\u05d9\u05e7\u05d9\u05d9\u05d4 SIDURIM / \u05d1\u05e0\u05d9\u05d9\u05d4 / \u05de\u05e1\u05de\u05db\u05d9\u05dd."}</p>
 
       <input
         type="file"
         onChange={handleDriveFile}
         disabled={isUploading}
       />
+
+      <button
+        className="primary"
+        type="button"
+        onClick={uploadSelectedFile}
+        disabled={!selectedFile || !isDriveReady || isUploading}
+      >
+        <Upload size={18} />
+        {isUploading
+          ? "\u05de\u05e2\u05dc\u05d4..."
+          : "\u05d4\u05e2\u05dc\u05d4 \u05dc-Google Drive"}
+      </button>
 
       <p>{status}</p>
 
@@ -734,7 +793,7 @@ function DriveDocumentsUpload() {
           target="_blank"
           rel="noreferrer"
         >
-          פתח את הקובץ ב-Google Drive
+          {"\u05e4\u05ea\u05d7 \u05d0\u05ea \u05d4\u05e7\u05d5\u05d1\u05e5 \u05d1-Google Drive"}
         </a>
       )}
     </section>

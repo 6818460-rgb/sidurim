@@ -38,7 +38,9 @@ async function getAccessToken() {
     return accessToken;
   }
 
-  await loadGoogleIdentityScript();
+  if (!window.google?.accounts?.oauth2) {
+    throw new Error("Google Drive authorization is not ready.");
+  }
 
   return new Promise((resolve, reject) => {
     if (!tokenClient) {
@@ -137,6 +139,10 @@ async function ensureFolderPath(parts) {
   }
 
   return parentId;
+}
+
+export async function prepareGoogleDrive() {
+  await loadGoogleIdentityScript();
 }
 
 export async function uploadFileToDrive(file, folderParts) {
