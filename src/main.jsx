@@ -642,9 +642,14 @@ function ModuleScreen({
 
       {tab === "build-suppliers" && <SupplierTable />}
 
-      {tab === "build-docs" && (
+      {(tab.startsWith("build-") ||
+        (tab.startsWith("work-") && tab !== "work-orders")) && (
         <DriveUpload
-          folderParts={["SIDURIM", "בנייה", "מסמכים"]}
+          folderParts={[
+            "SIDURIM",
+            domain,
+            tabs.find((current) => current[2] === tab)?.[0] || tab,
+          ]}
         />
       )}
 
