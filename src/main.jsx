@@ -26,6 +26,7 @@ import * as pdfjsLib from "pdfjs-dist";
 import pdfWorker from "pdfjs-dist/build/pdf.worker?url";
 
 import { auth, db, googleProvider } from "./firebaseConfig";
+import { uploadFileToDrive } from "./googleDrive";
 import {
   onAuthStateChanged,
   signInWithPopup,
