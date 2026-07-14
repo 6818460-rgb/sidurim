@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import {
   Home,
@@ -596,6 +596,20 @@ function ModuleScreen({
   upsertJobs,
 }) {
   const [tab, setTab] = useState(tabs[0][2]);
+  const contentRef = useRef(null);
+
+  function selectTab(key) {
+    setTab(key);
+
+    if (window.innerWidth <= 850) {
+      window.setTimeout(() => {
+        contentRef.current?.scrollIntoView({
+          behavior: "smooth",
+          block: "start",
+        });
+      }, 0);
+    }
+  }
 
   const shown = items.filter(
     (item) => item.domain === domain && item.area === tab
@@ -613,7 +627,7 @@ function ModuleScreen({
             title={label}
             text="פתח תת־רובליקה"
             active={tab === key}
-            onClick={() => setTab(key)}
+            onClick={() => selectTab(key)}
           />
         ))}
       </section>
@@ -624,7 +638,7 @@ function ModuleScreen({
 
       {tab === "build-suppliers" && <SupplierTable />}
 
-      <section className="card">
+      <section className="card" ref={contentRef}>
         <div className="cardHeader">
           <h2>{tabs.find((current) => current[2] === tab)?.[0]}</h2>
 
