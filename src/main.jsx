@@ -642,7 +642,11 @@ function ModuleScreen({
 
       {tab === "build-suppliers" && <SupplierTable />}
 
-      {tab === "build-docs" && <DriveDocumentsUpload />}
+      {tab === "build-docs" && (
+        <DriveUpload
+          folderParts={["SIDURIM", "בנייה", "מסמכים"]}
+        />
+      )}
 
       <section className="card" ref={contentRef}>
         <div className="cardHeader">
@@ -670,7 +674,10 @@ function ModuleScreen({
 }
 
 
-function DriveDocumentsUpload() {
+function DriveUpload({
+  folderParts,
+  heading = "\u05d4\u05e2\u05dc\u05d0\u05ea \u05de\u05e1\u05de\u05da \u05dc-Google Drive",
+}) {
   const [status, setStatus] = useState(
     "\u05d1\u05d7\u05e8 \u05de\u05e1\u05de\u05da \u05d5\u05dc\u05d0\u05d7\u05e8 \u05de\u05db\u05df \u05dc\u05d7\u05e5 \u05e2\u05dc \u05d4\u05e2\u05dc\u05d0\u05d4 \u05dc-Google Drive."
   );
@@ -731,11 +738,7 @@ function DriveDocumentsUpload() {
     setStatus(`\u05de\u05e2\u05dc\u05d4 \u05d0\u05ea "${file.name}" \u05dc-Google Drive...`);
 
     try {
-      const result = await uploadFileToDrive(file, [
-        "SIDURIM",
-        "\u05d1\u05e0\u05d9\u05d9\u05d4",
-        "\u05de\u05e1\u05de\u05db\u05d9\u05dd",
-      ]);
+      const result = await uploadFileToDrive(file, folderParts);
 
       setUploadedFile(result);
       setSelectedFile(null);
@@ -762,10 +765,10 @@ function DriveDocumentsUpload() {
     <section className="card pdf">
       <h2>
         <Upload size={22} />
-        {"\u05d4\u05e2\u05dc\u05d0\u05ea \u05de\u05e1\u05de\u05da \u05dc-Google Drive"}
+        {heading}
       </h2>
 
-      <p>{"\u05d4\u05e7\u05d5\u05d1\u05e5 \u05d9\u05d9\u05e9\u05de\u05e8 \u05d1\u05ea\u05d9\u05e7\u05d9\u05d9\u05d4 SIDURIM / \u05d1\u05e0\u05d9\u05d9\u05d4 / \u05de\u05e1\u05de\u05db\u05d9\u05dd."}</p>
+      <p>{folderParts.join(" / ")}</p>
 
       <input
         type="file"
