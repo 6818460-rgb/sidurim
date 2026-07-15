@@ -1,0 +1,292 @@
+.supplierComparison {
+  overflow: hidden;
+}
+
+.supplierComparisonHeader,
+.supplierComparisonActions,
+.savedComparisonCard,
+.savedComparisonButtons {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.supplierComparisonHeader h2,
+.supplierComparisonHeader p {
+  margin: 0 0 6px;
+}
+
+.supplierComparisonHeader button,
+.supplierComparisonActions button,
+.savedComparisonButtons button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+}
+
+.supplierComparisonMeta {
+  display: grid;
+  grid-template-columns: minmax(180px, 0.8fr) minmax(180px, 0.8fr) minmax(260px, 1.6fr);
+  gap: 14px;
+  margin: 20px 0;
+}
+
+.supplierComparisonMeta label,
+.supplierMobileCard label {
+  display: block;
+  margin-bottom: 6px;
+  font-weight: 700;
+}
+
+.supplierComparisonMeta input,
+.supplierComparisonMeta select,
+.supplierScoreTable input,
+.supplierScoreTable textarea,
+.supplierMobileCard input,
+.supplierMobileCard textarea {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.supplierDesktopTable {
+  overflow-x: auto;
+  border: 1px solid #d9e1ea;
+  border-radius: 14px;
+}
+
+.supplierScoreTable {
+  width: 100%;
+  min-width: 1120px;
+  border-collapse: collapse;
+}
+
+.supplierScoreTable th,
+.supplierScoreTable td {
+  min-width: 155px;
+  padding: 9px;
+  border: 1px solid #d9e1ea;
+  text-align: center;
+  vertical-align: middle;
+}
+
+.supplierScoreTable th:first-child {
+  min-width: 260px;
+  text-align: right;
+}
+
+.supplierScoreTable td:nth-child(2),
+.supplierScoreTable th:nth-child(2) {
+  min-width: 80px;
+  font-weight: 700;
+}
+
+.supplierScoreTable thead th {
+  background: #1f4e78;
+  color: white;
+}
+
+.supplierScoreTable tbody th {
+  background: #f4f8fb;
+}
+
+.supplierScoreTable input,
+.supplierScoreTable textarea {
+  min-width: 120px;
+}
+
+.scoreInput {
+  text-align: center;
+}
+
+.calculatedRow td {
+  background: #eef5fb;
+  font-weight: 700;
+}
+
+.finalScoreRow th,
+.finalScoreRow td {
+  background: #e6f2e4;
+  font-weight: 800;
+}
+
+.winnerCell {
+  outline: 3px solid #68a657;
+  outline-offset: -3px;
+}
+
+.winnerBadge {
+  display: block;
+  margin-top: 4px;
+  font-size: 12px;
+}
+
+.chooseSupplier {
+  display: inline-flex !important;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  margin: 0 !important;
+}
+
+.chooseSupplier input {
+  width: auto !important;
+}
+
+.supplierFormula {
+  margin-top: 16px;
+  padding: 12px 14px;
+  border-radius: 10px;
+  background: #eef5fb;
+}
+
+.supplierComparisonActions {
+  justify-content: flex-start;
+  margin-top: 16px;
+}
+
+.supplierComparisonActions span {
+  font-weight: 700;
+}
+
+.savedComparisons {
+  margin-top: 26px;
+  padding-top: 18px;
+  border-top: 1px solid #d9e1ea;
+}
+
+.savedComparisonGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 12px;
+}
+
+.savedComparisonCard {
+  align-items: flex-start;
+  padding: 14px;
+  border: 1px solid #d9e1ea;
+  border-radius: 12px;
+  background: #fff;
+}
+
+.savedComparisonCard p {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin: 6px 0 0;
+}
+
+.savedComparisonButtons {
+  flex-direction: column;
+  align-items: stretch;
+}
+
+.supplierCurrentContext {
+  margin: 16px 0 0;
+  color: #5a6875;
+}
+
+.supplierMobileCards {
+  display: none;
+}
+
+@media (max-width: 850px) {
+  .supplierComparisonHeader,
+  .supplierComparisonActions,
+  .savedComparisonCard {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .supplierComparisonHeader button,
+  .supplierComparisonActions button {
+    width: 100%;
+  }
+
+  .supplierComparisonMeta {
+    grid-template-columns: 1fr;
+  }
+
+  .supplierDesktopTable {
+    display: none;
+  }
+
+  .supplierMobileCards {
+    display: grid;
+    gap: 14px;
+  }
+
+  .supplierMobileCard {
+    display: grid;
+    gap: 8px;
+    padding: 14px;
+    border: 1px solid #d9e1ea;
+    border-radius: 14px;
+    background: #fff;
+  }
+
+  .supplierMobileCard h3 {
+    margin: 0 0 6px;
+  }
+
+  .mobileWinner {
+    border: 2px solid #68a657;
+    background: #f2f8f0;
+  }
+
+  .mobileCriterion {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 82px;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .mobileCriterion label {
+    margin: 0;
+  }
+
+  .mobileResultGrid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    padding: 10px;
+    border-radius: 10px;
+    background: #eef5fb;
+  }
+
+  .savedComparisonButtons {
+    width: 100%;
+  }
+}
+
+/* תיקון צבע כותרות הקריטריונים בטבלת השוואת הספקים */
+.supplierScoreTable tbody th {
+  color: #1f2937 !important;
+}
+
+.supplierScoreTable .calculatedRow th,
+.supplierScoreTable .finalScoreRow th {
+  color: #1f2937 !important;
+}
+
+
+/* עיצוב מחיר בפועל ומשקל מחיר נפרדים */
+.supplierScoreTable .priceWeightRow th,
+.supplierScoreTable .priceWeightRow td {
+  font-weight: 700;
+  background: #f8fafc;
+  color: #1f2937;
+}
+
+.mobilePriceWeight {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 8px 0 14px;
+  padding: 10px 12px;
+  border: 1px solid #d7e0ea;
+  border-radius: 10px;
+  background: #f8fafc;
+}

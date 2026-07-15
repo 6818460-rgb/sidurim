@@ -45,6 +45,7 @@ import {
 } from "firebase/firestore";
 
 import "./style.css";
+import SupplierComparison from "./SupplierComparison";
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorker;
 
@@ -445,6 +446,8 @@ function App() {
             items={filtered}
             addItem={addItem}
             openCard={setSelected}
+            saveItem={saveItem}
+            removeItem={removeItem}
           />
         )}
 
@@ -600,6 +603,8 @@ function ModuleScreen({
   addItem,
   openCard,
   upsertJobs,
+  saveItem,
+  removeItem,
 }) {
   const [tab, setTab] = useState(tabs[0][2]);
   const contentRef = useRef(null);
@@ -618,7 +623,17 @@ function ModuleScreen({
   }
 
   const shown = items.filter(
-    (item) => item.domain === domain && item.area === tab
+    (item) =>
+      item.domain === domain &&
+      item.area === tab &&
+      item.itemType !== "supplier-comparison"
+  );
+
+  const supplierComparisons = items.filter(
+    (item) =>
+      item.domain === "בנייה" &&
+      item.area === "build-suppliers" &&
+      item.itemType === "supplier-comparison"
   );
 
   return (
@@ -642,7 +657,13 @@ function ModuleScreen({
         <PdfImport upsertJobs={upsertJobs} />
       )}
 
-      {tab === "build-suppliers" && <SupplierTable />}
+      {tab === "build-suppliers" && (
+        <SupplierComparison
+          comparisons={supplierComparisons}
+          onSave={saveItem}
+          onDelete={removeItem}
+        />
+      )}
 
       {(tab.startsWith("build-") ||
         (tab.startsWith("work-") && tab !== "work-orders")) && (
@@ -655,7 +676,11 @@ function ModuleScreen({
         />
       )}
 
-      <section className="card" ref={contentRef}>
+      <section
+        className="card"
+        ref={contentRef}
+        style={tab === "build-suppliers" ? { display: "none" } : undefined}
+      >
         <div className="cardHeader">
           <h2>{tabs.find((current) => current[2] === tab)?.[0]}</h2>
 
