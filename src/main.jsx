@@ -20,6 +20,7 @@ import {
   Upload,
   LogIn,
   LogOut,
+  Archive,
 } from "lucide-react";
 
 import * as pdfjsLib from "pdfjs-dist";
@@ -395,6 +396,12 @@ function App() {
           active={screen === "money"}
           onClick={() => setScreen("money")}
         />
+        <Nav
+          icon={<Archive />}
+          label="ארכיון משימות"
+          active={screen === "archive"}
+          onClick={() => setScreen("archive")}
+        />
       </aside>
 
       <main className="main">
@@ -476,6 +483,10 @@ function App() {
             openCard={setSelected}
             driveFolderParts={["SIDURIM", "\u05db\u05e1\u05e4\u05d9\u05dd", "\u05db\u05dc\u05dc\u05d9"]}
           />
+        )}
+
+        {screen === "archive" && (
+          <ArchiveScreen items={filtered} openCard={setSelected} />
         )}
 
         {selected && (
@@ -633,6 +644,7 @@ function ModuleScreen({
     (item) =>
       item.domain === domain &&
       item.area === tab &&
+      !item.done &&
       item.itemType !== "supplier-comparison"
   );
 
@@ -1132,6 +1144,73 @@ function SupplierTable() {
   );
 }
 
+
+function ArchiveScreen({ items, openCard }) {
+  const completedItems = items
+    .filter((item) => item.done)
+    .sort((a, b) => {
+      const aTime = new Date(a.completedAt || 0).getTime();
+      const bTime = new Date(b.completedAt || 0).getTime();
+      return bTime - aTime;
+    });
+
+  return (
+    <section className="card">
+      <div className="cardHeader">
+        <h1>ארכיון משימות</h1>
+        <span className="pill">{completedItems.length} משימות</span>
+      </div>
+
+      {completedItems.length ? (
+        <div style={{ overflowX: "auto" }}>
+          <table>
+            <thead>
+              <tr>
+                <th>משימה</th>
+                <th>תחום</th>
+                <th>התחילה</th>
+                <th>הסתיימה</th>
+              </tr>
+            </thead>
+            <tbody>
+              {completedItems.map((item) => (
+                <tr
+                  key={item.id}
+                  onClick={() => openCard(item)}
+                  style={{ cursor: "pointer" }}
+                >
+                  <td>{item.title}</td>
+                  <td>{item.domain}</td>
+                  <td>{formatTaskDate(item.createdAt)}</td>
+                  <td>{formatTaskDate(item.completedAt)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : (
+        <p>עדיין אין משימות שהסתיימו.</p>
+      )}
+    </section>
+  );
+}
+
+function formatTaskDate(value) {
+  if (!value) return "לא ידוע";
+
+  const date =
+    typeof value?.toDate === "function"
+      ? value.toDate()
+      : new Date(value);
+
+  if (Number.isNaN(date.getTime())) return "לא ידוע";
+
+  return new Intl.DateTimeFormat("he-IL", {
+    dateStyle: "short",
+    timeStyle: "short",
+  }).format(date);
+}
+
 function Simple({
   title,
   items,
@@ -1139,6 +1218,8 @@ function Simple({
   openCard,
   driveFolderParts,
 }) {
+  const activeItems = items.filter((item) => !item.done);
+
   return (
     <>
       {driveFolderParts && (
@@ -1155,8 +1236,8 @@ function Simple({
           </button>
         </div>
 
-        {items.length ? (
-          items.map((item) => (
+        {activeItems.length ? (
+          activeItems.map((item) => (
             <TaskRow key={item.id} item={item} openCard={openCard} />
           ))
         ) : (
@@ -1301,6 +1382,14 @@ function TaskModal({
           </div>
         )}
 
+        <div className="contactBox">
+          <h3>תאריכי המשימה</h3>
+          <p>התחילה: {formatTaskDate(draft.createdAt)}</p>
+          {draft.done && (
+            <p>הסתיימה: {formatTaskDate(draft.completedAt)}</p>
+          )}
+        </div>
+
         <label>הערות</label>
         <textarea
           rows="5"
@@ -1315,7 +1404,14 @@ function TaskModal({
             שמור
           </button>
 
-          <button onClick={onToggle}>בוצע / בטל</button>
+          <button
+            onClick={() => {
+              onToggle();
+              onClose();
+            }}
+          >
+            {draft.done ? "החזר למשימות פעילות" : "סמן כבוצע"}
+          </button>
 
           <button
             onClick={() => {
