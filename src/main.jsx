@@ -203,6 +203,9 @@ function App() {
       done: false,
       createdAt: new Date().toISOString(),
       completedAt: null,
+      estimatedMinutes: null,
+      scheduledDate: "",
+      scheduledTime: "",
       logs: [],
       ...extra,
     });
@@ -213,17 +216,32 @@ function App() {
     setSelected(updatedItem);
   }
 
-  function toggleDone(id) {
-    const item = items.find((current) => String(current.id) === String(id));
+  async function toggleDone(id) {
+    const item = items.find(
+      (current) => String(current.id) === String(id)
+    );
+
     if (!item) return;
 
     const willBeDone = !item.done;
 
-    saveItem({
+    const updatedItem = {
       ...item,
       done: willBeDone,
-      completedAt: willBeDone ? new Date().toISOString() : null,
-    });
+      completedAt: willBeDone
+        ? new Date().toISOString()
+        : null,
+    };
+
+    setItems((currentItems) =>
+      currentItems.map((current) =>
+        String(current.id) === String(id)
+          ? updatedItem
+          : current
+      )
+    );
+
+    await saveItem(updatedItem);
   }
 
   async function upsertJobs(jobs) {
@@ -291,6 +309,9 @@ function App() {
         done: false,
         createdAt: new Date().toISOString(),
         completedAt: null,
+        estimatedMinutes: null,
+        scheduledDate: "",
+        scheduledTime: "",
         logs: [],
         jobNumber: job.number,
         reportDate: job.date,
@@ -1170,6 +1191,8 @@ function ArchiveScreen({ items, openCard }) {
                 <th>תחום</th>
                 <th>התחילה</th>
                 <th>הסתיימה</th>
+                <th>הערכת זמן</th>
+                <th>משך טיפול</th>
               </tr>
             </thead>
             <tbody>
@@ -1183,6 +1206,8 @@ function ArchiveScreen({ items, openCard }) {
                   <td>{item.domain}</td>
                   <td>{formatTaskDate(item.createdAt)}</td>
                   <td>{formatTaskDate(item.completedAt)}</td>
+                  <td>{formatEstimatedTime(item.estimatedMinutes)}</td>
+                  <td>{formatTaskDuration(item.createdAt, item.completedAt)}</td>
                 </tr>
               ))}
             </tbody>
@@ -1209,6 +1234,77 @@ function formatTaskDate(value) {
     dateStyle: "short",
     timeStyle: "short",
   }).format(date);
+}
+
+
+function formatTaskDuration(createdAt, completedAt) {
+  if (!createdAt || !completedAt) return "לא ידוע";
+
+  const start =
+    typeof createdAt?.toDate === "function"
+      ? createdAt.toDate()
+      : new Date(createdAt);
+
+  const end =
+    typeof completedAt?.toDate === "function"
+      ? completedAt.toDate()
+      : new Date(completedAt);
+
+  if (
+    Number.isNaN(start.getTime()) ||
+    Number.isNaN(end.getTime()) ||
+    end < start
+  ) {
+    return "לא ידוע";
+  }
+
+  const totalMinutes = Math.floor((end - start) / 60000);
+  const days = Math.floor(totalMinutes / 1440);
+  const hours = Math.floor((totalMinutes % 1440) / 60);
+  const minutes = totalMinutes % 60;
+
+  const parts = [];
+
+  if (days) parts.push(`${days} ${days === 1 ? "יום" : "ימים"}`);
+  if (hours) parts.push(`${hours} ${hours === 1 ? "שעה" : "שעות"}`);
+  if (!days && minutes) {
+    parts.push(`${minutes} ${minutes === 1 ? "דקה" : "דקות"}`);
+  }
+
+  return parts.length ? parts.join(" ו־") : "פחות מדקה";
+}
+
+
+function formatEstimatedTime(value) {
+  const minutes = Number(value);
+
+  if (!Number.isFinite(minutes) || minutes <= 0) {
+    return "לא הוגדר";
+  }
+
+  if (minutes < 60) {
+    return `${minutes} ${minutes === 1 ? "דקה" : "דקות"}`;
+  }
+
+  if (minutes < 1440) {
+    const hours = minutes / 60;
+    return Number.isInteger(hours)
+      ? `${hours} ${hours === 1 ? "שעה" : "שעות"}`
+      : `${hours.toFixed(1)} שעות`;
+  }
+
+  const days = minutes / 1440;
+
+  if (days < 7) {
+    return Number.isInteger(days)
+      ? `${days} ${days === 1 ? "יום" : "ימים"}`
+      : `${days.toFixed(1)} ימים`;
+  }
+
+  const weeks = days / 7;
+  return Number.isInteger(weeks)
+    ? `${weeks} ${weeks === 1 ? "שבוע" : "שבועות"}`
+    : `${weeks.toFixed(1)} שבועות`;
 }
 
 function Simple({
@@ -1261,7 +1357,31 @@ function Module({ icon, title, text, onClick, active }) {
   );
 }
 
+
+function formatScheduledDateTime(dateValue, timeValue) {
+  if (!dateValue) return "לא נקבע";
+
+  const [year, month, day] = String(dateValue).split("-");
+  const dateText =
+    year && month && day
+      ? `${day}/${month}/${year}`
+      : String(dateValue);
+
+  return timeValue ? `${dateText} בשעה ${timeValue}` : dateText;
+}
+
 function TaskRow({ item, openCard }) {
+  const estimatedMinutes = Number(item.estimatedMinutes);
+
+  const estimateIndicator =
+    Number.isFinite(estimatedMinutes) && estimatedMinutes > 0
+      ? estimatedMinutes <= 60
+        ? "🟢"
+        : estimatedMinutes <= 480
+        ? "🟡"
+        : "🔴"
+      : "";
+
   return (
     <div className="task" onClick={() => openCard(item)}>
       <b>{item.title}</b>
@@ -1269,6 +1389,14 @@ function TaskRow({ item, openCard }) {
       <span className="pill">{item.domain}</span>
       <span className={item.priority === "גבוהה" ? "pill high" : "pill"}>
         {item.priority}
+      </span>
+      <span className="pill">
+        {estimateIndicator
+          ? `${estimateIndicator} ${formatEstimatedTime(item.estimatedMinutes)}`
+          : "⏱ לא הוגדר"}
+      </span>
+      <span className="pill">
+        📅 {formatScheduledDateTime(item.scheduledDate, item.scheduledTime)}
       </span>
     </div>
   );
@@ -1324,6 +1452,54 @@ function TaskModal({
           <option>בינונית</option>
           <option>נמוכה</option>
         </select>
+
+        <label>הערכת זמן</label>
+        <select
+          value={draft.estimatedMinutes ?? ""}
+          onChange={(event) =>
+            setDraft({
+              ...draft,
+              estimatedMinutes: event.target.value
+                ? Number(event.target.value)
+                : null,
+            })
+          }
+        >
+          <option value="">לא הוגדר</option>
+          <option value="5">5 דקות</option>
+          <option value="15">15 דקות</option>
+          <option value="30">30 דקות</option>
+          <option value="60">שעה</option>
+          <option value="120">שעתיים</option>
+          <option value="240">חצי יום</option>
+          <option value="480">יום עבודה</option>
+          <option value="960">יומיים</option>
+          <option value="2400">שבוע עבודה</option>
+        </select>
+
+        <label>תאריך מתוכנן</label>
+        <input
+          type="date"
+          value={draft.scheduledDate || ""}
+          onChange={(event) =>
+            setDraft({
+              ...draft,
+              scheduledDate: event.target.value,
+            })
+          }
+        />
+
+        <label>שעת התחלה</label>
+        <input
+          type="time"
+          value={draft.scheduledTime || ""}
+          onChange={(event) =>
+            setDraft({
+              ...draft,
+              scheduledTime: event.target.value,
+            })
+          }
+        />
 
         {isBuildContact && (
           <div className="contactBox">
@@ -1385,8 +1561,22 @@ function TaskModal({
         <div className="contactBox">
           <h3>תאריכי המשימה</h3>
           <p>התחילה: {formatTaskDate(draft.createdAt)}</p>
+          <p>הערכת זמן: {formatEstimatedTime(draft.estimatedMinutes)}</p>
+          <p>
+            מועד מתוכנן:{" "}
+            {formatScheduledDateTime(
+              draft.scheduledDate,
+              draft.scheduledTime
+            )}
+          </p>
           {draft.done && (
-            <p>הסתיימה: {formatTaskDate(draft.completedAt)}</p>
+            <>
+              <p>הסתיימה: {formatTaskDate(draft.completedAt)}</p>
+              <p>
+                משך טיפול:{" "}
+                {formatTaskDuration(draft.createdAt, draft.completedAt)}
+              </p>
+            </>
           )}
         </div>
 
