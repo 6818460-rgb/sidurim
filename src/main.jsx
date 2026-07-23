@@ -211,9 +211,17 @@ function App() {
     });
   }
 
-  function updateItem(updatedItem) {
-    saveItem(updatedItem);
+  async function updateItem(updatedItem) {
+    setItems((currentItems) =>
+      currentItems.map((current) =>
+        String(current.id) === String(updatedItem.id)
+          ? updatedItem
+          : current
+      )
+    );
+
     setSelected(updatedItem);
+    await saveItem(updatedItem);
   }
 
   async function toggleDone(id) {
@@ -533,12 +541,117 @@ function Nav({ icon, label, active, onClick }) {
   );
 }
 
-function HomeScreen({ items, setScreen, openCard }) {
-  const openHighPriority = items.filter(
-    (item) => !item.done && item.priority === "גבוהה"
-  );
 
-  const top = openHighPriority[0];
+function sortHomeTasks(tasks) {
+  return [...tasks]
+    .filter((item) => {
+      if (item.done) return false;
+
+      const days = getDaysFromToday(item);
+      const isDueWithinTwoDays =
+        days !== null && days >= 0 && days <= 2;
+
+      return isDueWithinTwoDays || item.priority === "גבוהה";
+    })
+    .sort((a, b) => {
+      // בתוך הרשימה הראשית, משימות עבודה מופיעות ראשונות.
+      const aIsWork = a.domain === "עבודה";
+      const bIsWork = b.domain === "עבודה";
+
+      if (aIsWork !== bIsWork) {
+        return aIsWork ? -1 : 1;
+      }
+
+      const daysA = getDaysFromToday(a);
+      const daysB = getDaysFromToday(b);
+
+      const isNearA =
+        daysA !== null && daysA >= 0 && daysA <= 2;
+      const isNearB =
+        daysB !== null && daysB >= 0 && daysB <= 2;
+
+      if (isNearA !== isNearB) {
+        return isNearA ? -1 : 1;
+      }
+
+      if (isNearA && isNearB && daysA !== daysB) {
+        return daysA - daysB;
+      }
+
+      const priorityDifference =
+        priorityRank(a.priority) - priorityRank(b.priority);
+
+      if (priorityDifference !== 0) {
+        return priorityDifference;
+      }
+
+      if (daysA !== null && daysB !== null && daysA !== daysB) {
+        return daysA - daysB;
+      }
+
+      if (daysA !== null && daysB === null) return -1;
+      if (daysA === null && daysB !== null) return 1;
+
+      const createdA = new Date(a.createdAt || 0).getTime();
+      const createdB = new Date(b.createdAt || 0).getTime();
+
+      return createdA - createdB;
+    });
+}
+
+function getOpportunityTasks(tasks, excludedIds, limit = 5) {
+  return [...tasks]
+    .filter((item) => {
+      if (item.done) return false;
+      if (excludedIds.has(String(item.id))) return false;
+
+      return item.priority === "בינונית" || item.priority === "נמוכה";
+    })
+    .sort((a, b) => {
+      const aIsWork = a.domain === "עבודה";
+      const bIsWork = b.domain === "עבודה";
+
+      if (aIsWork !== bIsWork) {
+        return aIsWork ? -1 : 1;
+      }
+
+      const priorityDifference =
+        priorityRank(a.priority) - priorityRank(b.priority);
+
+      if (priorityDifference !== 0) {
+        return priorityDifference;
+      }
+
+      const daysA = getDaysFromToday(a);
+      const daysB = getDaysFromToday(b);
+
+      if (daysA !== null && daysB !== null && daysA !== daysB) {
+        return daysA - daysB;
+      }
+
+      if (daysA !== null && daysB === null) return -1;
+      if (daysA === null && daysB !== null) return 1;
+
+      const createdA = new Date(a.createdAt || 0).getTime();
+      const createdB = new Date(b.createdAt || 0).getTime();
+
+      return createdA - createdB;
+    })
+    .slice(0, limit);
+}
+
+function HomeScreen({ items, setScreen, openCard }) {
+  const sortedTasks = sortHomeTasks(items);
+  const top = sortedTasks[0];
+
+  const opportunityTasks =
+    sortedTasks.length < 3
+      ? getOpportunityTasks(
+          items,
+          new Set(sortedTasks.map((item) => String(item.id))),
+          5
+        )
+      : [];
 
   return (
     <>
@@ -547,7 +660,7 @@ function HomeScreen({ items, setScreen, openCard }) {
         {top ? (
           <TaskRow item={top} openCard={openCard} />
         ) : (
-          <p>אין משימות בעדיפות גבוהה.</p>
+          <p>אין משימות פעילות.</p>
         )}
       </section>
 
@@ -579,18 +692,37 @@ function HomeScreen({ items, setScreen, openCard }) {
       </section>
 
       <section className="card">
-        <h2>משימות בחשיבות גבוהה בלבד</h2>
+        <div className="cardHeader">
+          <h2>משימות קרובות או בדחיפות גבוהה</h2>
+          <span className="pill">{sortedTasks.length} משימות</span>
+        </div>
 
-        {openHighPriority.length ? (
-          openHighPriority
-            .slice(0, 10)
-            .map((item) => (
-              <TaskRow key={item.id} item={item} openCard={openCard} />
-            ))
+        {sortedTasks.length ? (
+          sortedTasks.map((item) => (
+            <TaskRow key={item.id} item={item} openCard={openCard} />
+          ))
         ) : (
-          <p>אין משימות בעדיפות גבוהה.</p>
+          <p>אין כרגע משימות קרובות או בדחיפות גבוהה.</p>
         )}
       </section>
+
+      {opportunityTasks.length > 0 && (
+        <section className="card">
+          <div className="cardHeader">
+            <h2>הזדמנות — זמן לטפל במשימות נוספות</h2>
+            <span className="pill">{opportunityTasks.length} הצעות</span>
+          </div>
+
+          <p>
+            כרגע אין עומס גדול של משימות דחופות. אפשר לנצל את הזמן ולקדם
+            אחת מהמשימות הבאות.
+          </p>
+
+          {opportunityTasks.map((item) => (
+            <TaskRow key={item.id} item={item} openCard={openCard} />
+          ))}
+        </section>
+      )}
     </>
   );
 }
@@ -634,6 +766,93 @@ function BuildScreen(props) {
   );
 }
 
+
+function parseScheduledDate(item) {
+  if (!item?.scheduledDate) return null;
+
+  const [year, month, day] = String(item.scheduledDate)
+    .split("-")
+    .map(Number);
+
+  if (!year || !month || !day) return null;
+
+  const date = new Date(year, month - 1, day);
+  date.setHours(0, 0, 0, 0);
+
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+function getDaysFromToday(item) {
+  const scheduledDate = parseScheduledDate(item);
+  if (!scheduledDate) return null;
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  return Math.round((scheduledDate - today) / 86400000);
+}
+
+function priorityRank(priority) {
+  if (priority === "גבוהה") return 0;
+  if (priority === "בינונית") return 1;
+  if (priority === "נמוכה") return 2;
+  return 3;
+}
+
+function sortActiveTasks(tasks) {
+  const activeTasks = tasks.filter((item) => !item.done);
+
+  const hasNearTasks = activeTasks.some((item) => {
+    const days = getDaysFromToday(item);
+    return days !== null && days <= 6;
+  });
+
+  return [...activeTasks].sort((a, b) => {
+    const daysA = getDaysFromToday(a);
+    const daysB = getDaysFromToday(b);
+
+    function dateGroup(days) {
+      if (days === null) return 5;
+      if (days < 0) return 0;
+      if (days <= 3) return 1;
+      if (days <= 6) return 2;
+      return 3;
+    }
+
+    const groupA = dateGroup(daysA);
+    const groupB = dateGroup(daysB);
+
+    if (groupA !== groupB) {
+      if (!hasNearTasks) {
+        const aLowPriority = a.priority === "נמוכה";
+        const bLowPriority = b.priority === "נמוכה";
+
+        if (aLowPriority !== bLowPriority) {
+          return aLowPriority ? -1 : 1;
+        }
+      }
+
+      return groupA - groupB;
+    }
+
+    if (daysA !== null && daysB !== null && daysA !== daysB) {
+      return daysA - daysB;
+    }
+
+    const priorityDifference =
+      priorityRank(a.priority) - priorityRank(b.priority);
+
+    if (priorityDifference !== 0) {
+      return priorityDifference;
+    }
+
+    const createdA = new Date(a.createdAt || 0).getTime();
+    const createdB = new Date(b.createdAt || 0).getTime();
+
+    return createdA - createdB;
+  });
+}
+
 function ModuleScreen({
   title,
   domain,
@@ -661,12 +880,13 @@ function ModuleScreen({
     }
   }
 
-  const shown = items.filter(
-    (item) =>
-      item.domain === domain &&
-      item.area === tab &&
-      !item.done &&
-      item.itemType !== "supplier-comparison"
+  const shown = sortActiveTasks(
+    items.filter(
+      (item) =>
+        item.domain === domain &&
+        item.area === tab &&
+        item.itemType !== "supplier-comparison"
+    )
   );
 
   const supplierComparisons = items.filter(
@@ -1314,7 +1534,7 @@ function Simple({
   openCard,
   driveFolderParts,
 }) {
-  const activeItems = items.filter((item) => !item.done);
+  const activeItems = sortActiveTasks(items);
 
   return (
     <>
@@ -1370,6 +1590,18 @@ function formatScheduledDateTime(dateValue, timeValue) {
   return timeValue ? `${dateText} בשעה ${timeValue}` : dateText;
 }
 
+
+function getScheduleUrgencyLabel(item) {
+  const days = getDaysFromToday(item);
+
+  if (days === null) return "";
+  if (days < 0) return `⚠️ באיחור של ${Math.abs(days)} ימים`;
+  if (days === 0) return "🔴 היום";
+  if (days <= 3) return `🔴 בעוד ${days} ימים`;
+  if (days <= 6) return `🟡 בעוד ${days} ימים`;
+  return "";
+}
+
 function TaskRow({ item, openCard }) {
   const estimatedMinutes = Number(item.estimatedMinutes);
 
@@ -1398,6 +1630,9 @@ function TaskRow({ item, openCard }) {
       <span className="pill">
         📅 {formatScheduledDateTime(item.scheduledDate, item.scheduledTime)}
       </span>
+      {getScheduleUrgencyLabel(item) && (
+        <span className="pill">{getScheduleUrgencyLabel(item)}</span>
+      )}
     </div>
   );
 }
