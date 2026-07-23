@@ -640,9 +640,159 @@ function getOpportunityTasks(tasks, excludedIds, limit = 5) {
     .slice(0, limit);
 }
 
+
+function getTaskPriorityScore(item) {
+  if (item.done) return -Infinity;
+
+  const days = getDaysFromToday(item);
+  const estimatedMinutes = Number(item.estimatedMinutes);
+
+  let score = 0;
+
+  // תאריך יעד
+  if (days !== null) {
+    if (days < 0) {
+      score += 1000 + Math.min(Math.abs(days), 30) * 10;
+    } else if (days === 0) {
+      score += 900;
+    } else if (days === 1) {
+      score += 800;
+    } else if (days === 2) {
+      score += 700;
+    } else if (days === 3) {
+      score += 520;
+    } else if (days === 4) {
+      score += 480;
+    } else if (days <= 6) {
+      score += 400 - days * 10;
+    } else {
+      score += Math.max(0, 220 - days);
+    }
+  }
+
+  // דחיפות ידנית
+  if (item.priority === "גבוהה") score += 450;
+  else if (item.priority === "בינונית") score += 220;
+  else if (item.priority === "נמוכה") score += 50;
+
+  // משימות עבודה מקבלות קדימות
+  if (item.domain === "עבודה") score += 180;
+
+  // משימה קצרה מקבלת יתרון קטן כאשר שאר הנתונים דומים
+  if (Number.isFinite(estimatedMinutes) && estimatedMinutes > 0) {
+    if (estimatedMinutes <= 15) score += 80;
+    else if (estimatedMinutes <= 30) score += 60;
+    else if (estimatedMinutes <= 60) score += 40;
+    else if (estimatedMinutes <= 120) score += 20;
+  }
+
+  return score;
+}
+
+function getTaskRisk(item) {
+  const days = getDaysFromToday(item);
+
+  if (
+    item.priority === "גבוהה" ||
+    (days !== null && days <= 2)
+  ) {
+    return {
+      level: "high",
+      label: "🔴 דחוף",
+      background: "#fff1f0",
+      border: "#ef4444",
+      text: "#991b1b",
+    };
+  }
+
+  if (
+    item.priority === "בינונית" ||
+    (days !== null && days >= 3 && days <= 4)
+  ) {
+    return {
+      level: "medium",
+      label: "🟠 מתקרב",
+      background: "#fff7ed",
+      border: "#f97316",
+      text: "#9a3412",
+    };
+  }
+
+  return {
+    level: "low",
+    label: "🟢 רגוע",
+    background: "#f0fdf4",
+    border: "#22c55e",
+    text: "#166534",
+  };
+}
+
+function getRecommendedTasks(items, limit = 5) {
+  return [...items]
+    .filter((item) => !item.done)
+    .sort((a, b) => {
+      const scoreDifference =
+        getTaskPriorityScore(b) - getTaskPriorityScore(a);
+
+      if (scoreDifference !== 0) {
+        return scoreDifference;
+      }
+
+      const daysA = getDaysFromToday(a);
+      const daysB = getDaysFromToday(b);
+
+      if (daysA !== null && daysB !== null && daysA !== daysB) {
+        return daysA - daysB;
+      }
+
+      if (daysA !== null && daysB === null) return -1;
+      if (daysA === null && daysB !== null) return 1;
+
+      const priorityDifference =
+        priorityRank(a.priority) - priorityRank(b.priority);
+
+      if (priorityDifference !== 0) {
+        return priorityDifference;
+      }
+
+      const createdA = new Date(a.createdAt || 0).getTime();
+      const createdB = new Date(b.createdAt || 0).getTime();
+
+      return createdA - createdB;
+    })
+    .slice(0, limit);
+}
+
+function getRecommendationReason(item) {
+  const days = getDaysFromToday(item);
+  const reasons = [];
+
+  if (days !== null) {
+    if (days < 0) reasons.push("באיחור");
+    else if (days === 0) reasons.push("להיום");
+    else if (days === 1) reasons.push("למחר");
+    else if (days === 2) reasons.push("לעוד יומיים");
+  }
+
+  if (item.priority === "גבוהה") reasons.push("דחיפות גבוהה");
+  if (item.domain === "עבודה") reasons.push("עבודה");
+
+  const estimatedMinutes = Number(item.estimatedMinutes);
+  if (
+    Number.isFinite(estimatedMinutes) &&
+    estimatedMinutes > 0 &&
+    estimatedMinutes <= 60
+  ) {
+    reasons.push("משימה קצרה");
+  }
+
+  return reasons.length ? reasons.join(" · ") : "מומלצת לפי סדר העדיפויות";
+}
+
 function HomeScreen({ items, setScreen, openCard }) {
   const sortedTasks = sortHomeTasks(items);
   const top = sortedTasks[0];
+  const recommendedTasks = getRecommendedTasks(items, 5);
 
   const opportunityTasks =
     sortedTasks.length < 3
@@ -661,6 +811,30 @@ function HomeScreen({ items, setScreen, openCard }) {
           <TaskRow item={top} openCard={openCard} />
         ) : (
           <p>אין משימות פעילות.</p>
+        )}
+      </section>
+
+      <section className="card">
+        <div className="cardHeader">
+          <h2>מה הכי נכון לעשות עכשיו</h2>
+          <span className="pill">{recommendedTasks.length} המלצות</span>
+        </div>
+
+        <p>
+          הדירוג משלב תאריך יעד, דחיפות, משימות עבודה והערכת זמן.
+        </p>
+
+        {recommendedTasks.length ? (
+          recommendedTasks.map((item, index) => (
+            <div key={item.id}>
+              <div style={{ marginBottom: 4, fontWeight: 700 }}>
+                {index + 1}. {getRecommendationReason(item)}
+              </div>
+              <TaskRow item={item} openCard={openCard} />
+            </div>
+          ))
+        ) : (
+          <p>אין כרגע משימות פעילות.</p>
         )}
       </section>
 
@@ -844,6 +1018,13 @@ function sortActiveTasks(tasks) {
 
     if (priorityDifference !== 0) {
       return priorityDifference;
+    }
+
+    const scoreDifference =
+      getTaskPriorityScore(b) - getTaskPriorityScore(a);
+
+    if (scoreDifference !== 0) {
+      return scoreDifference;
     }
 
     const createdA = new Date(a.createdAt || 0).getTime();
@@ -1604,6 +1785,7 @@ function getScheduleUrgencyLabel(item) {
 
 function TaskRow({ item, openCard }) {
   const estimatedMinutes = Number(item.estimatedMinutes);
+  const risk = getTaskRisk(item);
 
   const estimateIndicator =
     Number.isFinite(estimatedMinutes) && estimatedMinutes > 0
@@ -1615,21 +1797,45 @@ function TaskRow({ item, openCard }) {
       : "";
 
   return (
-    <div className="task" onClick={() => openCard(item)}>
+    <div
+      className="task"
+      onClick={() => openCard(item)}
+      style={{
+        background: risk.background,
+        borderColor: risk.border,
+        borderRightWidth: 5,
+      }}
+    >
       <b>{item.title}</b>
       <span>{item.status}</span>
       <span className="pill">{item.domain}</span>
+
+      <span
+        className="pill"
+        style={{
+          background: risk.background,
+          border: `1px solid ${risk.border}`,
+          color: risk.text,
+          fontWeight: 700,
+        }}
+      >
+        {risk.label}
+      </span>
+
       <span className={item.priority === "גבוהה" ? "pill high" : "pill"}>
         {item.priority}
       </span>
+
       <span className="pill">
         {estimateIndicator
           ? `${estimateIndicator} ${formatEstimatedTime(item.estimatedMinutes)}`
           : "⏱ לא הוגדר"}
       </span>
+
       <span className="pill">
         📅 {formatScheduledDateTime(item.scheduledDate, item.scheduledTime)}
       </span>
+
       {getScheduleUrgencyLabel(item) && (
         <span className="pill">{getScheduleUrgencyLabel(item)}</span>
       )}
@@ -1803,6 +2009,12 @@ function TaskModal({
               draft.scheduledDate,
               draft.scheduledTime
             )}
+          </p>
+          <p>
+            מצב נוכחי:{" "}
+            <strong style={{ color: getTaskRisk(draft).text }}>
+              {getTaskRisk(draft).label}
+            </strong>
           </p>
           {draft.done && (
             <>
