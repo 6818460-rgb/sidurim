@@ -789,114 +789,233 @@ function getRecommendationReason(item) {
   return reasons.length ? reasons.join(" · ") : "מומלצת לפי סדר העדיפויות";
 }
 
-function HomeScreen({ items, setScreen, openCard }) {
-  const sortedTasks = sortHomeTasks(items);
-  const top = sortedTasks[0];
-  const recommendedTasks = getRecommendedTasks(items, 5);
 
-  const opportunityTasks =
-    sortedTasks.length < 3
-      ? getOpportunityTasks(
-          items,
-          new Set(sortedTasks.map((item) => String(item.id))),
-          5
-        )
-      : [];
+function formatLocalDateKey(date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function getLocalTodayKey() {
+  return formatLocalDateKey(new Date());
+}
+
+function getLocalTomorrowKey() {
+  const tomorrow = new Date();
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  return formatLocalDateKey(tomorrow);
+}
+
+function sortTodayTasks(tasks) {
+  return [...tasks].sort((a, b) => {
+    const priorityDifference =
+      priorityRank(a.priority) - priorityRank(b.priority);
+
+    if (priorityDifference !== 0) {
+      return priorityDifference;
+    }
+
+    const timeA = a.scheduledTime || "23:59";
+    const timeB = b.scheduledTime || "23:59";
+
+    return timeA.localeCompare(timeB);
+  });
+}
+
+function HomeScreen({ items, setScreen, openCard }) {
+  const dailyDomains = ["עבודה", "בנייה", "אישי", "כספים"];
+
+  const [selectedDailyDomains, setSelectedDailyDomains] = useState(() => {
+    try {
+      const saved = JSON.parse(
+        localStorage.getItem("sidurim-daily-domains") || "null"
+      );
+
+      return Array.isArray(saved) && saved.length
+        ? saved
+        : dailyDomains;
+    } catch {
+      return dailyDomains;
+    }
+  });
+
+  const [showAllTasks, setShowAllTasks] = useState(false);
+
+  function toggleDailyDomain(domain) {
+    setSelectedDailyDomains((current) => {
+      const exists = current.includes(domain);
+
+      let next = exists
+        ? current.filter((item) => item !== domain)
+        : [...current, domain];
+
+      if (!next.length) {
+        next = [domain];
+      }
+
+      localStorage.setItem(
+        "sidurim-daily-domains",
+        JSON.stringify(next)
+      );
+
+      return next;
+    });
+  }
+
+  const todayKey = getLocalTodayKey();
+  const tomorrowKey = getLocalTomorrowKey();
+
+  const todayTasks = sortTodayTasks(
+    items.filter(
+      (item) =>
+        !item.done &&
+        item.scheduledDate === todayKey &&
+        selectedDailyDomains.includes(item.domain)
+    )
+  );
+
+  const tomorrowTasks = sortTodayTasks(
+    items.filter(
+      (item) =>
+        !item.done &&
+        item.scheduledDate === tomorrowKey &&
+        selectedDailyDomains.includes(item.domain)
+    )
+  );
+
+  const allActiveTasks = [...items]
+    .filter(
+      (item) =>
+        !item.done &&
+        selectedDailyDomains.includes(item.domain)
+    )
+    .sort((a, b) => {
+      const aToday = a.scheduledDate === todayKey;
+      const bToday = b.scheduledDate === todayKey;
+
+      if (aToday !== bToday) {
+        return aToday ? -1 : 1;
+      }
+
+      const aTomorrow = a.scheduledDate === tomorrowKey;
+      const bTomorrow = b.scheduledDate === tomorrowKey;
+
+      if (aTomorrow !== bTomorrow) {
+        return aTomorrow ? -1 : 1;
+      }
+
+      const priorityDifference =
+        priorityRank(a.priority) - priorityRank(b.priority);
+
+      if (priorityDifference !== 0) {
+        return priorityDifference;
+      }
+
+      const dateA = parseScheduledDate(a);
+      const dateB = parseScheduledDate(b);
+
+      if (dateA && dateB && dateA.getTime() !== dateB.getTime()) {
+        return dateA - dateB;
+      }
+
+      if (dateA && !dateB) return -1;
+      if (!dateA && dateB) return 1;
+
+      const timeA = a.scheduledTime || "23:59";
+      const timeB = b.scheduledTime || "23:59";
+
+      return timeA.localeCompare(timeB);
+    });
 
   return (
     <>
-      <section className="card focus">
-        <h1>המשימה הכי חשובה עכשיו</h1>
-        {top ? (
-          <TaskRow item={top} openCard={openCard} />
+      <section className="card">
+        <div className="cardHeader">
+          <h1>המשימות שלי להיום</h1>
+          <span className="pill">{todayTasks.length} משימות</span>
+        </div>
+
+        <div className="buttons" style={{ marginBottom: 14 }}>
+          {dailyDomains.map((domain) => {
+            const active = selectedDailyDomains.includes(domain);
+
+            return (
+              <button
+                key={domain}
+                type="button"
+                className={active ? "primary" : ""}
+                onClick={() => toggleDailyDomain(domain)}
+              >
+                {active ? "✓ " : ""}
+                {domain}
+              </button>
+            );
+          })}
+        </div>
+
+        {todayTasks.length ? (
+          todayTasks.map((item) => (
+            <TaskRow
+              key={item.id}
+              item={item}
+              openCard={openCard}
+            />
+          ))
         ) : (
-          <p>אין משימות פעילות.</p>
+          <p>אין להיום משימות פעילות בקטגוריות שבחרת.</p>
         )}
       </section>
 
       <section className="card">
         <div className="cardHeader">
-          <h2>מה הכי נכון לעשות עכשיו</h2>
-          <span className="pill">{recommendedTasks.length} המלצות</span>
+          <h2>המשימות שלי למחר</h2>
+          <span className="pill">{tomorrowTasks.length} משימות</span>
         </div>
 
-        <p>
-          הדירוג משלב תאריך יעד, דחיפות, משימות עבודה והערכת זמן.
-        </p>
+        {tomorrowTasks.length ? (
+          tomorrowTasks.map((item) => (
+            <TaskRow
+              key={item.id}
+              item={item}
+              openCard={openCard}
+            />
+          ))
+        ) : (
+          <p>אין למחר משימות פעילות בקטגוריות שבחרת.</p>
+        )}
+      </section>
 
-        {recommendedTasks.length ? (
-          recommendedTasks.map((item, index) => (
-            <div key={item.id}>
-              <div style={{ marginBottom: 4, fontWeight: 700 }}>
-                {index + 1}. {getRecommendationReason(item)}
-              </div>
-              <TaskRow item={item} openCard={openCard} />
+      <section className="card">
+        <button
+          type="button"
+          className="primary"
+          onClick={() => setShowAllTasks((current) => !current)}
+        >
+          {showAllTasks ? "הסתר את כל המשימות" : "הצג את כל המשימות"}
+        </button>
+
+        {showAllTasks && (
+          <div style={{ marginTop: 16 }}>
+            <div className="cardHeader">
+              <h2>כל המשימות הפעילות</h2>
+              <span className="pill">{allActiveTasks.length} משימות</span>
             </div>
-          ))
-        ) : (
-          <p>אין כרגע משימות פעילות.</p>
-        )}
-      </section>
 
-      <section className="grid4">
-        <Module
-          icon={<Briefcase />}
-          title="עבודה"
-          text="הזמנות, שיווק, אחזקה"
-          onClick={() => setScreen("work")}
-        />
-        <Module
-          icon={<Building2 />}
-          title="בנייה"
-          text="משימות, ספקים, חללים"
-          onClick={() => setScreen("build")}
-        />
-        <Module
-          icon={<User />}
-          title="אישי"
-          text="מטרות, בריאות, לימוד"
-          onClick={() => setScreen("personal")}
-        />
-        <Module
-          icon={<Wallet />}
-          title="כספים"
-          text="חשבוניות ותשלומים"
-          onClick={() => setScreen("money")}
-        />
-      </section>
-
-      <section className="card">
-        <div className="cardHeader">
-          <h2>משימות קרובות או בדחיפות גבוהה</h2>
-          <span className="pill">{sortedTasks.length} משימות</span>
-        </div>
-
-        {sortedTasks.length ? (
-          sortedTasks.map((item) => (
-            <TaskRow key={item.id} item={item} openCard={openCard} />
-          ))
-        ) : (
-          <p>אין כרגע משימות קרובות או בדחיפות גבוהה.</p>
-        )}
-      </section>
-
-      {opportunityTasks.length > 0 && (
-        <section className="card">
-          <div className="cardHeader">
-            <h2>הזדמנות — זמן לטפל במשימות נוספות</h2>
-            <span className="pill">{opportunityTasks.length} הצעות</span>
+            {allActiveTasks.length ? (
+              allActiveTasks.map((item) => (
+                <TaskRow
+                  key={item.id}
+                  item={item}
+                  openCard={openCard}
+                />
+              ))
+            ) : (
+              <p>אין משימות פעילות בקטגוריות שבחרת.</p>
+            )}
           </div>
-
-          <p>
-            כרגע אין עומס גדול של משימות דחופות. אפשר לנצל את הזמן ולקדם
-            אחת מהמשימות הבאות.
-          </p>
-
-          {opportunityTasks.map((item) => (
-            <TaskRow key={item.id} item={item} openCard={openCard} />
-          ))}
-        </section>
-      )}
+        )}
+      </section>
     </>
   );
 }
@@ -1916,6 +2035,50 @@ function TaskModal({
           <option value="480">יום עבודה</option>
           <option value="960">יומיים</option>
           <option value="2400">שבוע עבודה</option>
+        </select>
+
+        <label>לביצוע</label>
+        <select
+          value={
+            draft.scheduledDate === getLocalTodayKey()
+              ? "today"
+              : draft.scheduledDate === getLocalTomorrowKey()
+              ? "tomorrow"
+              : draft.scheduledDate
+              ? "custom"
+              : "none"
+          }
+          onChange={(event) => {
+            const value = event.target.value;
+
+            if (value === "today") {
+              setDraft({
+                ...draft,
+                scheduledDate: getLocalTodayKey(),
+              });
+            } else if (value === "tomorrow") {
+              setDraft({
+                ...draft,
+                scheduledDate: getLocalTomorrowKey(),
+              });
+            } else if (value === "none") {
+              setDraft({
+                ...draft,
+                scheduledDate: "",
+                scheduledTime: "",
+              });
+            } else {
+              setDraft({
+                ...draft,
+                scheduledDate: draft.scheduledDate || "",
+              });
+            }
+          }}
+        >
+          <option value="none">ללא תכנון</option>
+          <option value="today">להיום</option>
+          <option value="tomorrow">למחר</option>
+          <option value="custom">תאריך אחר</option>
         </select>
 
         <label>תאריך מתוכנן</label>
