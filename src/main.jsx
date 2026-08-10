@@ -505,13 +505,16 @@ function App() {
         )}
 
         {screen === "money" && (
-          <Simple
-            title="כספים"
-            items={filtered.filter((item) => item.domain === "כספים")}
-            add={() => addItem("כספים", "money", "פריט כספי חדש")}
-            openCard={setSelected}
-            driveFolderParts={["SIDURIM", "\u05db\u05e1\u05e4\u05d9\u05dd", "\u05db\u05dc\u05dc\u05d9"]}
-          />
+          <>
+            <ReceiptCameraUpload />
+            <Simple
+              title="כספים"
+              items={filtered.filter((item) => item.domain === "כספים")}
+              add={() => addItem("כספים", "money", "פריט כספי חדש")}
+              openCard={setSelected}
+              driveFolderParts={["SIDURIM", "\u05db\u05e1\u05e4\u05d9\u05dd", "\u05db\u05dc\u05dc\u05d9"]}
+            />
+          </>
         )}
 
         {screen === "archive" && (
@@ -1825,6 +1828,119 @@ function formatEstimatedTime(value) {
   return Number.isInteger(weeks)
     ? `${weeks} ${weeks === 1 ? "שבוע" : "שבועות"}`
     : `${weeks.toFixed(1)} שבועות`;
+}
+
+
+function ReceiptCameraUpload() {
+  const cameraInputRef = useRef(null);
+  const [status, setStatus] = useState("");
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploadedFile, setUploadedFile] = useState(null);
+
+  async function handleReceiptPhoto(event) {
+    const file = event.target.files?.[0];
+
+    if (!file) return;
+
+    setIsUploading(true);
+    setUploadedFile(null);
+    setStatus("מעלה את צילום החשבונית ל-Google Drive...");
+
+    try {
+      await prepareGoogleDrive();
+
+      const now = new Date();
+      const stamp = [
+        now.getFullYear(),
+        String(now.getMonth() + 1).padStart(2, "0"),
+        String(now.getDate()).padStart(2, "0"),
+        "_",
+        String(now.getHours()).padStart(2, "0"),
+        "-",
+        String(now.getMinutes()).padStart(2, "0"),
+        "-",
+        String(now.getSeconds()).padStart(2, "0"),
+      ].join("");
+
+      const extension =
+        file.name && file.name.includes(".")
+          ? `.${file.name.split(".").pop()}`
+          : ".jpg";
+
+      const renamedFile = new File(
+        [file],
+        `חשבונית_${stamp}${extension}`,
+        { type: file.type || "image/jpeg" }
+      );
+
+      const result = await uploadFileToDrive(
+        renamedFile,
+        ["SIDURIM", "כספים", "חשבוניות ספקים צילום"]
+      );
+
+      setUploadedFile(result);
+      setStatus("צילום החשבונית נשמר בהצלחה ב-Google Drive.");
+    } catch (error) {
+      console.error("Receipt camera upload error:", error);
+
+      const details =
+        error instanceof Error
+          ? error.message
+          : error?.type ||
+            error?.error ||
+            JSON.stringify(error);
+
+      setStatus(
+        `העלאת החשבונית נכשלה: ${details || "שגיאה לא ידועה"}`
+      );
+    } finally {
+      setIsUploading(false);
+      event.target.value = "";
+    }
+  }
+
+  return (
+    <section className="card pdf">
+      <h2>חשבוניות ספקים צילום</h2>
+
+      <p>
+        צילום מהנייד נשמר אוטומטית בתיקייה:
+        {" "}
+        SIDURIM / כספים / חשבוניות ספקים צילום
+      </p>
+
+      <input
+        ref={cameraInputRef}
+        type="file"
+        accept="image/*"
+        capture="environment"
+        onChange={handleReceiptPhoto}
+        style={{ display: "none" }}
+      />
+
+      <button
+        type="button"
+        className="primary"
+        disabled={isUploading}
+        onClick={() => cameraInputRef.current?.click()}
+      >
+        <Camera size={18} />
+        {isUploading ? "מעלה צילום..." : "צלם חשבונית"}
+      </button>
+
+      {status && <p>{status}</p>}
+
+      {uploadedFile?.webViewLink && (
+        <a
+          href={uploadedFile.webViewLink}
+          target="_blank"
+          rel="noreferrer"
+        >
+          פתח את החשבונית ב-Google Drive
+        </a>
+      )}
+    </section>
+  );
 }
 
 function Simple({

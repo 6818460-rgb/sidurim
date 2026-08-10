@@ -290,3 +290,135 @@
   border-radius: 10px;
   background: #f8fafc;
 }
+
+
+/* בנייד: השוואות ספקים לקריאה בלבד */
+.supplierMobileReadOnly {
+  display: none;
+}
+
+.supplierDesktopEditor {
+  display: block;
+}
+
+@media (max-width: 850px) {
+  .supplierDesktopEditor {
+    display: none !important;
+  }
+
+  .supplierMobileReadOnly {
+    display: block;
+  }
+
+  .supplierMobileReadOnlyHeader {
+    margin-bottom: 14px;
+  }
+
+  .supplierMobileReadOnlyHeader h2,
+  .supplierMobileReadOnlyHeader p {
+    margin: 0 0 6px;
+  }
+
+  .supplierMobileSavedList {
+    display: grid;
+    gap: 16px;
+  }
+
+  .supplierMobileSavedComparison {
+    border: 1px solid #d9e1ea;
+    border-radius: 14px;
+    padding: 14px;
+    background: #fff;
+  }
+
+  .supplierMobileSavedComparisonHeader {
+    margin-bottom: 12px;
+  }
+
+  .supplierMobileSavedComparisonHeader h3 {
+    margin: 0 0 4px;
+  }
+
+  .supplierMobileSavedComparisonHeader p {
+    margin: 0;
+    color: #5a6875;
+  }
+
+  .supplierMobileSavedSuppliers {
+    display: grid;
+    gap: 12px;
+  }
+
+  .supplierMobileSavedSupplier {
+    border: 1px solid #d9e1ea;
+    border-radius: 12px;
+    padding: 12px;
+    background: #f8fafc;
+  }
+
+  .supplierMobileChosen {
+    border: 2px solid #68a657;
+    background: #f2f8f0;
+  }
+
+  .supplierMobileSavedSupplierTitle {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    margin-bottom: 10px;
+  }
+
+  .supplierMobileChosenBadge {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-weight: 700;
+    color: #2f6b24;
+  }
+
+  .supplierMobileReadOnlyGrid {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 8px 12px;
+    align-items: center;
+  }
+
+  .supplierMobileReadOnlyGrid span {
+    color: #5a6875;
+  }
+
+  .supplierMobileCriteriaDetails {
+    margin-top: 12px;
+  }
+
+  .supplierMobileCriteriaDetails summary {
+    cursor: pointer;
+    font-weight: 700;
+  }
+
+  .supplierMobileCriteriaReadOnly {
+    display: grid;
+    gap: 7px;
+    margin-top: 10px;
+  }
+
+  .supplierMobileCriteriaReadOnly > div {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    padding-bottom: 6px;
+    border-bottom: 1px solid #e5e7eb;
+  }
+
+  .supplierMobileNotes {
+    margin-top: 12px;
+    padding-top: 10px;
+    border-top: 1px solid #e5e7eb;
+  }
+
+  .supplierMobileNotes p {
+    margin: 5px 0 0;
+    white-space: pre-wrap;
+  }
+}

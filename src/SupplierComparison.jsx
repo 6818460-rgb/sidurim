@@ -1,3 +1,4 @@
+
 import React, { useMemo, useState } from "react";
 import { Plus, Save, Trash2, Trophy } from "lucide-react";
 import "./supplierComparison.css";
@@ -78,58 +79,64 @@ function normalizeSavedComparison(item) {
   };
 }
 
+
+function calculateComparisonResults(suppliers) {
+  const positivePrices = suppliers
+    .map((supplier) => toNumber(supplier.price))
+    .filter((price) => price > 0);
+
+  const lowestPrice = positivePrices.length ? Math.min(...positivePrices) : 0;
+
+  const calculated = suppliers.map((supplier) => {
+    const scoresComplete = CRITERIA.every((criterion) => {
+      const score = toNumber(supplier[criterion.key]);
+      return score >= 1 && score <= 10;
+    });
+
+    const price = toNumber(supplier.price);
+    const qualityPoints = CRITERIA.reduce(
+      (sum, criterion) => sum + toNumber(supplier[criterion.key]) * criterion.weight,
+      0
+    );
+    const priceScore = price > 0 && lowestPrice > 0 ? (lowestPrice / price) * 10 : 0;
+    const pricePoints = priceScore * 0.25;
+    const complete = Boolean(supplier.name.trim()) && price > 0 && scoresComplete;
+    const total = complete ? qualityPoints + pricePoints : null;
+
+    return {
+      complete,
+      qualityPoints,
+      priceScore,
+      pricePoints,
+      total,
+      rank: null,
+    };
+  });
+
+  const ranked = calculated
+    .map((result, index) => ({ index, total: result.total }))
+    .filter((entry) => Number.isFinite(entry.total))
+    .sort((a, b) => b.total - a.total);
+
+  ranked.forEach((entry, position) => {
+    const previous = ranked[position - 1];
+    calculated[entry.index].rank =
+      previous && previous.total === entry.total
+        ? calculated[previous.index].rank
+        : position + 1;
+  });
+
+  return calculated;
+}
+
 export default function SupplierComparison({ comparisons = [], onSave, onDelete }) {
   const [draft, setDraft] = useState(blankDraft);
   const [message, setMessage] = useState("");
 
-  const results = useMemo(() => {
-    const positivePrices = draft.suppliers
-      .map((supplier) => toNumber(supplier.price))
-      .filter((price) => price > 0);
-
-    const lowestPrice = positivePrices.length ? Math.min(...positivePrices) : 0;
-
-    const calculated = draft.suppliers.map((supplier) => {
-      const scoresComplete = CRITERIA.every((criterion) => {
-        const score = toNumber(supplier[criterion.key]);
-        return score >= 1 && score <= 10;
-      });
-
-      const price = toNumber(supplier.price);
-      const qualityPoints = CRITERIA.reduce(
-        (sum, criterion) => sum + toNumber(supplier[criterion.key]) * criterion.weight,
-        0
-      );
-      const priceScore = price > 0 && lowestPrice > 0 ? (lowestPrice / price) * 10 : 0;
-      const pricePoints = priceScore * 0.25;
-      const complete = Boolean(supplier.name.trim()) && price > 0 && scoresComplete;
-      const total = complete ? qualityPoints + pricePoints : null;
-
-      return {
-        complete,
-        qualityPoints,
-        priceScore,
-        pricePoints,
-        total,
-        rank: null,
-      };
-    });
-
-    const ranked = calculated
-      .map((result, index) => ({ index, total: result.total }))
-      .filter((entry) => Number.isFinite(entry.total))
-      .sort((a, b) => b.total - a.total);
-
-    ranked.forEach((entry, position) => {
-      const previous = ranked[position - 1];
-      calculated[entry.index].rank =
-        previous && previous.total === entry.total
-          ? calculated[previous.index].rank
-          : position + 1;
-    });
-
-    return calculated;
-  }, [draft.suppliers]);
+  const results = useMemo(
+    () => calculateComparisonResults(draft.suppliers),
+    [draft.suppliers]
+  );
 
   function updateDraft(key, value) {
     setDraft((current) => ({ ...current, [key]: value }));
@@ -213,6 +220,131 @@ export default function SupplierComparison({ comparisons = [], onSave, onDelete 
 
   return (
     <section className="card supplierComparison">
+      <div className="supplierMobileReadOnly">
+        <div className="supplierMobileReadOnlyHeader">
+          <h2>השוואות ספקים שמורות</h2>
+          <p>בנייד ההשוואות מוצגות לקריאה בלבד.</p>
+        </div>
+
+        {comparisons.length ? (
+          <div className="supplierMobileSavedList">
+            {comparisons.map((comparison) => {
+              const normalized = normalizeSavedComparison(comparison);
+              const savedResults = calculateComparisonResults(normalized.suppliers);
+              const savedField =
+                normalized.field === "אחר"
+                  ? normalized.customField
+                  : normalized.field;
+
+              return (
+                <article
+                  key={comparison.id}
+                  className="supplierMobileSavedComparison"
+                >
+                  <div className="supplierMobileSavedComparisonHeader">
+                    <div>
+                      <h3>{normalized.projectName || "ללא שם"}</h3>
+                      <p>{savedField || "ללא תחום"}</p>
+                    </div>
+                  </div>
+
+                  <div className="supplierMobileSavedSuppliers">
+                    {normalized.suppliers.map((supplier, index) => {
+                      const result = savedResults[index];
+                      const chosen =
+                        normalized.selectedSupplierId === supplier.id;
+
+                      return (
+                        <div
+                          key={supplier.id}
+                          className={
+                            chosen
+                              ? "supplierMobileSavedSupplier supplierMobileChosen"
+                              : "supplierMobileSavedSupplier"
+                          }
+                        >
+                          <div className="supplierMobileSavedSupplierTitle">
+                            <strong>
+                              ספק {index + 1}
+                              {supplier.name ? ` — ${supplier.name}` : ""}
+                            </strong>
+                            {chosen && (
+                              <span className="supplierMobileChosenBadge">
+                                <Trophy size={14} /> נבחר
+                              </span>
+                            )}
+                          </div>
+
+                          <div className="supplierMobileReadOnlyGrid">
+                            <span>טלפון</span>
+                            <b>{supplier.phone || "—"}</b>
+
+                            <span>מחיר</span>
+                            <b>
+                              {toNumber(supplier.price) > 0
+                                ? `${toNumber(supplier.price).toLocaleString("he-IL")} ₪`
+                                : "—"}
+                            </b>
+
+                            <span>איכות</span>
+                            <b>{fixed(result.qualityPoints)} / 7.5</b>
+
+                            <span>ציון מחיר</span>
+                            <b>
+                              {result.priceScore
+                                ? `${fixed(result.priceScore)} / 10`
+                                : "—"}
+                            </b>
+
+                            <span>ציון סופי</span>
+                            <b>
+                              {result.total === null
+                                ? "חסרים נתונים"
+                                : `${fixed(result.total)} / 10`}
+                            </b>
+
+                            <span>דירוג</span>
+                            <b>
+                              {result.rank ? `מקום ${result.rank}` : "—"}
+                            </b>
+                          </div>
+
+                          <details className="supplierMobileCriteriaDetails">
+                            <summary>פירוט ציוני איכות</summary>
+                            <div className="supplierMobileCriteriaReadOnly">
+                              {CRITERIA.map((criterion) => (
+                                <div key={criterion.key}>
+                                  <span>{criterion.label}</span>
+                                  <b>
+                                    {supplier[criterion.key] === ""
+                                      ? "—"
+                                      : supplier[criterion.key]}
+                                  </b>
+                                </div>
+                              ))}
+                            </div>
+                          </details>
+
+                          {supplier.notes && (
+                            <div className="supplierMobileNotes">
+                              <strong>הערות:</strong>
+                              <p>{supplier.notes}</p>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </article>
+              );
+            })}
+          </div>
+        ) : (
+          <p>עדיין אין השוואות ספקים שמורות.</p>
+        )}
+      </div>
+
+      <div className="supplierDesktopEditor">
       <div className="supplierComparisonHeader">
         <div>
           <h2>השוואת 5 ספקים — 75% איכות / 25% מחיר</h2>
@@ -484,6 +616,6 @@ export default function SupplierComparison({ comparisons = [], onSave, onDelete 
       <p className="supplierCurrentContext">
         השוואה נוכחית: {fieldName || "ללא תחום"}{draft.projectName ? ` — ${draft.projectName}` : ""}
       </p>
+      </div>
     </section>
-  );
-}
+  );}
