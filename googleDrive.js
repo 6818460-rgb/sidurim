@@ -1,4 +1,6 @@
-const GOOGLE_CLIENT_ID = "31285013229-gu07d9375jjgqsvsp1djp5qs2h9mv7s3.apps.googleusercontent.com";
+const GOOGLE_CLIENT_ID =
+  "31285013229-gu07d9375jjgqsvsp1djp5qs2h9mv7s3.apps.googleusercontent.com";
+
 const DRIVE_SCOPE = "https://www.googleapis.com/auth/drive.file";
 
 let tokenClient = null;
@@ -46,7 +48,14 @@ async function getAccessToken() {
         client_id: GOOGLE_CLIENT_ID,
         scope: DRIVE_SCOPE,
         callback: () => {},
-        error_callback: (error) => reject(error),
+        error_callback: (error) => {
+          const message =
+            error?.message ||
+            error?.type ||
+            error?.error ||
+            "Google authorization failed";
+          reject(new Error(message));
+        },
       });
     }
 
@@ -59,6 +68,7 @@ async function getAccessToken() {
       accessToken = response.access_token;
       tokenExpiresAt =
         Date.now() + Number(response.expires_in || 3600) * 1000;
+
       resolve(accessToken);
     };
 
@@ -68,27 +78,73 @@ async function getAccessToken() {
   });
 }
 
+export async function prepareGoogleDrive() {
+  await getAccessToken();
+  return true;
+}
+
+async function fetchWithTimeout(
+  url,
+  options = {},
+  timeoutMs = 30000,
+  stage = "Google Drive"
+) {
+  const controller = new AbortController();
+  const timeoutId = window.setTimeout(
+    () => controller.abort(),
+    timeoutMs
+  );
+
+  try {
+    return await fetch(url, {
+      ...options,
+      signal: controller.signal,
+    });
+  } catch (error) {
+    if (error?.name === "AbortError") {
+      throw new Error(
+        `${stage}: Google Drive לא החזיר תשובה בתוך 30 שניות.`
+      );
+    }
+
+    throw error;
+  } finally {
+    window.clearTimeout(timeoutId);
+  }
+}
+
 async function driveRequest(url, options = {}) {
   const token = await getAccessToken();
-  const response = await fetch(url, {
-    ...options,
-    headers: {
-      Authorization: `Bearer ${token}`,
-      ...(options.headers || {}),
+
+  const response = await fetchWithTimeout(
+    url,
+    {
+      ...options,
+      headers: {
+        Authorization: `Bearer ${token}`,
+        ...(options.headers || {}),
+      },
     },
-  });
+    30000,
+    "בקשת Google Drive"
+  );
 
   if (!response.ok) {
     const details = await response.text();
     throw new Error(`Google Drive ${response.status}: ${details}`);
   }
 
-  if (response.status === 204) return null;
+  if (response.status === 204) {
+    return null;
+  }
+
   return response.json();
 }
 
 function escapeDriveQuery(value) {
-  return String(value).replace(/\\/g, "\\\\").replace(/'/g, "\\'");
+  return String(value)
+    .replace(/\\/g, "\\\\")
+    .replace(/'/g, "\\'");
 }
 
 async function findOrCreateFolder(name, parentId = null) {
@@ -101,7 +157,7 @@ async function findOrCreateFolder(name, parentId = null) {
     `mimeType='application/vnd.google-apps.folder' and trashed=false`;
 
   const found = await driveRequest(
-    `https://www.googleapis.com/drive/v3/files?` +
+    "https://www.googleapis.com/drive/v3/files?" +
       new URLSearchParams({
         q,
         fields: "files(id,name)",
@@ -109,13 +165,17 @@ async function findOrCreateFolder(name, parentId = null) {
       })
   );
 
-  if (found.files?.length) return found.files[0].id;
+  if (found.files?.length) {
+    return found.files[0].id;
+  }
 
   const created = await driveRequest(
     "https://www.googleapis.com/drive/v3/files?fields=id",
     {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+      },
       body: JSON.stringify({
         name,
         mimeType: "application/vnd.google-apps.folder",
@@ -132,8 +192,20 @@ async function ensureFolderPath(parts) {
 
   for (const rawPart of parts) {
     const part = String(rawPart || "").trim();
-    if (!part) continue;
-    parentId = await findOrCreateFolder(part, parentId);
+
+    if (!part) {
+      continue;
+    }
+
+    try {
+      parentId = await findOrCreateFolder(part, parentId);
+    } catch (error) {
+      throw new Error(
+        `יצירת/איתור התיקייה "${part}" נכשלה: ${
+          error?.message || error
+        }`
+      );
+    }
   }
 
   return parentId;
@@ -155,17 +227,21 @@ export async function uploadFileToDrive(file, folderParts) {
   const body = new Blob(
     [
       `--${boundary}\r\n`,
-      'Content-Type: application/json; charset=UTF-8\r\n\r\n',
+      "Content-Type: application/json; charset=UTF-8\r\n\r\n",
       JSON.stringify(metadata),
       `\r\n--${boundary}\r\n`,
-      `Content-Type: ${file.type || "application/octet-stream"}\r\n\r\n`,
+      `Content-Type: ${
+        file.type || "application/octet-stream"
+      }\r\n\r\n`,
       file,
       `\r\n--${boundary}--`,
     ],
-    { type: `multipart/related; boundary=${boundary}` }
+    {
+      type: `multipart/related; boundary=${boundary}`,
+    }
   );
 
-  const response = await fetch(
+  const response = await fetchWithTimeout(
     "https://www.googleapis.com/upload/drive/v3/files?" +
       new URLSearchParams({
         uploadType: "multipart",
@@ -178,7 +254,9 @@ export async function uploadFileToDrive(file, folderParts) {
         "Content-Type": `multipart/related; boundary=${boundary}`,
       },
       body,
-    }
+    },
+    30000,
+    "העלאת הקובץ"
   );
 
   if (!response.ok) {
@@ -190,10 +268,16 @@ export async function uploadFileToDrive(file, folderParts) {
 }
 
 export async function deleteDriveFile(fileId) {
-  if (!fileId) return;
+  if (!fileId) {
+    return;
+  }
 
   await driveRequest(
-    `https://www.googleapis.com/drive/v3/files/${encodeURIComponent(fileId)}`,
-    { method: "DELETE" }
+    `https://www.googleapis.com/drive/v3/files/${encodeURIComponent(
+      fileId
+    )}`,
+    {
+      method: "DELETE",
+    }
   );
 }

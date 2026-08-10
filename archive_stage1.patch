@@ -1,0 +1,34 @@
+--- a/src/main.jsx
++++ b/src/main.jsx
+@@ -200,6 +200,8 @@
+       priority: "בינונית",
+       note: "",
+       done: false,
++      createdAt: new Date().toISOString(),
++      completedAt: null,
+       logs: [],
+       ...extra,
+     });
+@@ -214,9 +216,12 @@
+     const item = items.find((current) => String(current.id) === String(id));
+     if (!item) return;
+ 
++    const willBeDone = !item.done;
++
+     saveItem({
+       ...item,
+-      done: !item.done,
++      done: willBeDone,
++      completedAt: willBeDone ? new Date().toISOString() : null,
+     });
+   }
+ 
+@@ -283,6 +288,8 @@
+         priorityManuallySet: false,
+         note: `נוצר מתוך PDF. מספר עבודה: ${job.number} | תאריך: ${job.date}`,
+         done: false,
++        createdAt: new Date().toISOString(),
++        completedAt: null,
+         logs: [],
+         jobNumber: job.number,
+         reportDate: job.date,
