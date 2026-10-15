@@ -873,7 +873,7 @@ function HomeScreen({ items, setScreen, openCard }) {
     items.filter(
       (item) =>
         !item.done &&
-        item.scheduledDate === todayKey &&
+        (item.scheduledDate === todayKey || item.untilHandled === true) &&
         selectedDailyDomains.includes(item.domain)
     )
   );
@@ -894,8 +894,10 @@ function HomeScreen({ items, setScreen, openCard }) {
         selectedDailyDomains.includes(item.domain)
     )
     .sort((a, b) => {
-      const aToday = a.scheduledDate === todayKey;
-      const bToday = b.scheduledDate === todayKey;
+      const aToday =
+        a.scheduledDate === todayKey || a.untilHandled === true;
+      const bToday =
+        b.scheduledDate === todayKey || b.untilHandled === true;
 
       if (aToday !== bToday) {
         return aToday ? -1 : 1;
@@ -2124,7 +2126,9 @@ function TaskRow({ item, openCard }) {
       </span>
 
       <span className="pill">
-        📅 {formatScheduledDateTime(item.scheduledDate, item.scheduledTime)}
+        📅 {item.untilHandled
+          ? "עד שיטופל"
+          : formatScheduledDateTime(item.scheduledDate, item.scheduledTime)}
       </span>
 
       {getScheduleUrgencyLabel(item) && (
@@ -2212,7 +2216,9 @@ function TaskModal({
         <label>לביצוע</label>
         <select
           value={
-            draft.scheduledDate === getLocalTodayKey()
+            draft.untilHandled
+              ? "untilHandled"
+              : draft.scheduledDate === getLocalTodayKey()
               ? "today"
               : draft.scheduledDate === getLocalTomorrowKey()
               ? "tomorrow"
@@ -2226,22 +2232,33 @@ function TaskModal({
             if (value === "today") {
               setDraft({
                 ...draft,
+                untilHandled: false,
                 scheduledDate: getLocalTodayKey(),
               });
             } else if (value === "tomorrow") {
               setDraft({
                 ...draft,
+                untilHandled: false,
                 scheduledDate: getLocalTomorrowKey(),
+              });
+            } else if (value === "untilHandled") {
+              setDraft({
+                ...draft,
+                untilHandled: true,
+                scheduledDate: "",
+                scheduledTime: "",
               });
             } else if (value === "none") {
               setDraft({
                 ...draft,
+                untilHandled: false,
                 scheduledDate: "",
                 scheduledTime: "",
               });
             } else {
               setDraft({
                 ...draft,
+                untilHandled: false,
                 scheduledDate: draft.scheduledDate || "",
               });
             }
@@ -2250,6 +2267,7 @@ function TaskModal({
           <option value="none">ללא תכנון</option>
           <option value="today">להיום</option>
           <option value="tomorrow">למחר</option>
+          <option value="untilHandled">עד שיטופל</option>
           <option value="custom">תאריך אחר</option>
         </select>
 
@@ -2257,9 +2275,11 @@ function TaskModal({
         <input
           type="date"
           value={draft.scheduledDate || ""}
+          disabled={draft.untilHandled === true}
           onChange={(event) =>
             setDraft({
               ...draft,
+              untilHandled: false,
               scheduledDate: event.target.value,
             })
           }
@@ -2269,6 +2289,7 @@ function TaskModal({
         <input
           type="time"
           value={draft.scheduledTime || ""}
+          disabled={draft.untilHandled === true}
           onChange={(event) =>
             setDraft({
               ...draft,
@@ -2340,10 +2361,12 @@ function TaskModal({
           <p>הערכת זמן: {formatEstimatedTime(draft.estimatedMinutes)}</p>
           <p>
             מועד מתוכנן:{" "}
-            {formatScheduledDateTime(
-              draft.scheduledDate,
-              draft.scheduledTime
-            )}
+            {draft.untilHandled
+              ? "עד שיטופל"
+              : formatScheduledDateTime(
+                  draft.scheduledDate,
+                  draft.scheduledTime
+                )}
           </p>
           <p>
             מצב נוכחי:{" "}
