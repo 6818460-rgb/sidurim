@@ -73,6 +73,32 @@ export async function prepareGoogleDrive() {
   await getAccessToken();
   return true;
 }
+async function fetchWithTimeout(
+  url,
+  options = {},
+  timeoutMs = 30000,
+  stage = "Google Drive"
+) {
+  const controller = new AbortController();
+  const timeoutId = window.setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    return await fetch(url, {
+      ...options,
+      signal: controller.signal,
+    });
+  } catch (error) {
+    if (error?.name === "AbortError") {
+      throw new Error(
+        `${stage}: Google Drive לא החזיר תשובה בתוך 30 שניות.`
+      );
+    }
+
+    throw error;
+  } finally {
+    window.clearTimeout(timeoutId);
+  }
+}
 async function driveRequest(url, options = {}) {
   const token = await getAccessToken();
   const response = await fetch(url, {
@@ -174,21 +200,23 @@ export async function uploadFileToDrive(file, folderParts) {
     { type: `multipart/related; boundary=${boundary}` }
   );
 
-  const response = await fetch(
-    "https://www.googleapis.com/upload/drive/v3/files?" +
-      new URLSearchParams({
-        uploadType: "multipart",
-        fields: "id,name,webViewLink,iconLink,mimeType,size",
-      }),
-    {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${token}`,
-        "Content-Type": `multipart/related; boundary=${boundary}`,
-      },
-      body,
-    }
-  );
+  const response = await fetchWithTimeout(
+  "https://www.googleapis.com/upload/drive/v3/files?" +
+    new URLSearchParams({
+      uploadType: "multipart",
+      fields: "id,name,webViewLink,iconLink,mimeType,size",
+    }),
+  {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": `multipart/related; boundary=${boundary}`,
+    },
+    body,
+  },
+  30000,
+  "העלאת הקובץ"
+);
 
   if (!response.ok) {
     const details = await response.text();
