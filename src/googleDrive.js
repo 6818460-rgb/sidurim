@@ -69,10 +69,8 @@ async function getAccessToken() {
     });
   });
 }
-export async function prepareGoogleDrive() {
-  await getAccessToken();
-  return true;
-}
+
+
 async function fetchWithTimeout(
   url,
   options = {},
