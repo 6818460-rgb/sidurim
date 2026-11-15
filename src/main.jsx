@@ -47,6 +47,7 @@ import {
 
 import "./style.css";
 import SupplierComparison from "./SupplierComparison";
+import MagentaCRM from "./MagentaCRM";
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorker;
 
@@ -426,6 +427,12 @@ function App() {
           onClick={() => setScreen("money")}
         />
         <Nav
+          icon={<Users />}
+          label="מגנטה CRM"
+          active={screen === "magenta-crm"}
+          onClick={() => setScreen("magenta-crm")}
+        />
+        <Nav
           icon={<Archive />}
           label="ארכיון משימות"
           active={screen === "archive"}
@@ -516,6 +523,8 @@ function App() {
             />
           </>
         )}
+
+        {screen === "magenta-crm" && <MagentaCRM user={user} />}
 
         {screen === "archive" && (
           <ArchiveScreen items={filtered} openCard={setSelected} />
